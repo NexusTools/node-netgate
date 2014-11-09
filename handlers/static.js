@@ -6,6 +6,7 @@ module.exports = function(app, config) {
     
     if(!config.noRewrite) {
         var fs = require("fs");
+        var path = require("path");
         app.use(function(req, res, next) {
             var subpath = req.path;
             var pos = subpath.indexOf("?");
