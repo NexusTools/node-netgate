@@ -78,9 +78,10 @@ if(fallback) {
     });
 }
 
+var fallbackCode = process.env.HTTP_FALLBACK_CODE || 404;
 app.use(function(req, res) {
-    logger.warn("Serving 404", req.host, req.url);
-    res.sendStatus(process.env.HTTP_FALLBACK_CODE || 404);
+    logger.warn("Unhandled, sending", fallbackCode, "status code", req.host, req.url);
+    res.sendStatus(fallbackCode);
 });
 
 if(process.env.HTTP_HOST)
