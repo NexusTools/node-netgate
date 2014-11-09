@@ -28,8 +28,7 @@ describe("api", function() {
             res.on("data", function(chunk) {
                 document += chunk;
             });
-            res.on("end", function(chunk) {
-                console.dir(arguments);
+            res.on("end", function() {
                 try {
                     assert.equal(document,
                         fs.readFileSync(path.resolve(__dirname,
@@ -39,8 +38,6 @@ describe("api", function() {
                     done(e);
                 }
             });
-            
-            
                 
             //done();
         }).on('error', function(e) {

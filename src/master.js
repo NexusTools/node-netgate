@@ -1,4 +1,5 @@
 var logger = require("nulllogger");
+var paths = require("node-paths");
 var cluster = require("cluster");
 var _ = require("underscore");
 var path = require("path");
@@ -6,6 +7,7 @@ var fs = require("fs");
 
 var masterLogger = logger("Master");
 var topDir = path.dirname(__dirname);
+var handlerBase = new paths(path.resolve(topDir, "handlers"));
 module.exports = function(config, readyCallback) {
     var rootPath;
     if(!config || _.isString(config)) {
@@ -16,7 +18,8 @@ module.exports = function(config, readyCallback) {
     masterLogger.info("Preparing", config.name, "V" + config.version);
     if(config.description)
         masterLogger.info("\t", config.description);
-
+    
+    var handlersLookup = handlerBase.get(path.resolve(rootPath, "handlers"));
     if(config.wwwroot)
         config.hosts = {
             "*": config.wwwroot
@@ -55,9 +58,9 @@ module.exports = function(config, readyCallback) {
                     entry.handler = "static";
                 else
                     throw new Error("Missing handler " + JSON.stringify(entry));
-            } else if(!fs.existsSync(path.resolve(topDir, "handlers", entry.handler + ".js")))
-                throw new Error("No such handler exists `" + entry.handler + "`");
+            }
             
+            entry.handler = handlersLookup.resolve(entry.handler + ".js");
             handlers.push(entry);
         });
         
@@ -66,7 +69,8 @@ module.exports = function(config, readyCallback) {
     delete config;
     var env = {
         PROCESS_SEND_LOGGER: "true",
-        HOST_LAYOUT_JSON: JSON.stringify(hostsLayout)
+        HOST_LAYOUT_JSON: JSON.stringify(hostsLayout),
+        ROOT_PATH: rootPath
     };
     delete hostsLayout;
     

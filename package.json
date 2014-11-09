@@ -2,7 +2,7 @@
 	"name": "netgate",
 	"author": "NexusTools",
 	"homepage": "https://www.nexustools.net/projects#node-netgate",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"licenses": [
 		{
 			"type": "Apache License 2.0",
@@ -42,6 +42,7 @@
 		"vhost": "latest",
 		"express": "latest",
         "nulllogger": ">=0.0.9",
+        "node-paths": ">=0.1.7",
         "underscore": "latest"
 	},
 	"devDependencies": {

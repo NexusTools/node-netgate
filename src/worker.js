@@ -42,7 +42,7 @@ for(var key in hostsLayout) {
     
     var hostHandlers = [];
     host.forEach(function(entry) {
-        hostHandlers.push([require(path.resolve(topDir, "handlers", entry.handler + ".js")), entry]);
+        hostHandlers.push([require(entry.handler), entry]);
     });
     delete host;
     
