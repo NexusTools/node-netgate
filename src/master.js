@@ -41,12 +41,14 @@ module.exports = function(config, readyCallback) {
     for(var key in config.hosts) {
         var host = config.hosts[key];
         
-        if(_.isObject(host) || _.isString(host))
-            host = [{
-                handler: "logger"
-            }, host];
-        else if(!_.isArray(host))
-            throw new Error("Host value must be a `String`, `Array` or `Object`");
+        if(!_.isArray(host)) {
+            if(_.isObject(host) || _.isString(host))
+                host = [{
+                    handler: "logger"
+                }, host];
+            else
+                throw new Error("Host value must be a `String`, `Array` or `Object`");
+        }
 
         var handlers = [];
         host.forEach(function(entry) {
