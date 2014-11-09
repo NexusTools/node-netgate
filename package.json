@@ -1,0 +1,51 @@
+{
+	"name": "netgate",
+	"author": "NexusTools",
+	"homepage": "https://www.nexustools.net/projects#node-netgate",
+	"version": "0.0.1",
+	"licenses": [
+		{
+			"type": "Apache License 2.0",
+			"url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+		}
+	],
+	"description": "Easily setup a http route using express and vhost. Includes patches for specific hosts like OpenShift.",
+	"keywords": [
+        "hosts",
+        "virtual",
+        "website",
+        "hosting",
+        "modular",
+        "openshift",
+		"NexusTools",
+        "express",
+        "vhost"
+	],
+	"bugs": {
+		"url" : "https://github.com/NexusTools/node-netgate/issues"
+	},
+	"repository": {
+		"type" : "git",
+		"url" : "https://github.com/NexusTools/node-netgate.git"  
+	},
+	"preferGlobal" : true,
+	"main" : "src/master.js",
+	"scripts": {
+		"test": "mocha --bail --require ./test/support/env --reporter spec --timeout 10000 --globals __typeinclude__ --check-leaks test/",
+		"test-coverage": "istanbul cover node_modules/mocha/bin/_mocha -- --timeout 20000 --require test/support/env --bail --reporter spec --globals __typeinclude__ --check-leaks test/",
+		"test-travis": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --timeout 20000 --require test/support/env --reporter spec --globals __typeinclude__ --check-leaks test/"
+	},
+	"engines" : {
+		"node" : ">=1.0.0"
+	},
+	"dependencies": {
+		"vhost": "latest",
+		"express": "latest",
+        "nulllogger": ">=0.0.9",
+        "underscore": "latest"
+	},
+	"devDependencies": {
+		"istanbul": "0.3.2",
+    	"mocha": "~1.21.4"
+	}
+}

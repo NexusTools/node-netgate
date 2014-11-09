@@ -1,0 +1,10 @@
+{
+	"name": "static-website",
+	"description": "A test static website.",
+	"version": "0.0.1",
+	"wwwroot": "www",
+	"engine": {
+		"netgate": ">= 0.0.1"
+	},
+	"private": "true"
+}
