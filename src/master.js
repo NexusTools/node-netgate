@@ -9,6 +9,8 @@ var masterLogger = logger("Master");
 var topDir = path.dirname(__dirname);
 var handlerBase = new paths(path.resolve(topDir, "handlers"));
 module.exports = function(config, readyCallback) {
+    readyCallback = readyCallback || _.noop;
+    
     var rootPath;
     if(!config || _.isString(config)) {
         rootPath = path.resolve(config || require.main.id);
