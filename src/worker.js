@@ -64,11 +64,11 @@ for(var key in hostsLayout) {
     }
     
     hostLogger.gears("Configuring", pattern, host);
-    var subapp = express();
+    var hostRouter = express.Router();
     hostHandlers.forEach(function(handler) {
-        handler[0](subapp, handler[1], hostLogger);
+        handler[0](hostRouter, handler[1], hostLogger);
     });
-    app.use(vhost(new RegExp(pattern, flags), subapp));
+    app.use(vhost(new RegExp(pattern, flags), hostRouter));
 }
 
 if(fallback) {
@@ -82,6 +82,22 @@ var fallbackCode = process.env.HTTP_FALLBACK_CODE || 404;
 app.use(function(req, res) {
     logger.warn("Unhandled, sending", fallbackCode, "status code", req.host, req.url);
     res.sendStatus(fallbackCode);
+});
+
+//var crypto = require("crypto");
+app.use(function(err, req, res, next) {
+	//var sha1 = crypto.createHash("sha1");
+	//sha1.update(err.stack);
+	
+	res.statusCode = 500;
+	res.write("<html><head><title>Error occured</title></head>");
+	res.write("<body>Oops, it looks like something went wrong.");
+	//res.write("<div style='font-size: 70%; margin: 12px'>Reference ");
+	//res.write(sha1.digest("hex"));
+	//res.write("</div>");
+	res.end("</body></html>");
+	
+	logger.error(err.stack);
 });
 
 if(process.env.HTTP_HOST)
