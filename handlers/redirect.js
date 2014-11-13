@@ -21,13 +21,13 @@ module.exports = function(app, config, logger) {
 		
 		if(config.code)
 			redirect = function(req, res) {
-				var to = config.to + res.url;
+				var to = config.to + req.url;
 				logger.info("Redirecting to", to, config.code);
 				res.redirect(config.code, to);
 			};
 		else
 			redirect = function(req, res) {
-				var to = config.to + res.url;
+				var to = config.to + req.url;
 				logger.info("Redirecting to", to);
 				res.redirect(to);
 			};
