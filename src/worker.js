@@ -38,37 +38,39 @@ var fallback;
 var regexpWrap = /^\/(.+)\/$/;
 var hostsLayout = JSON.parse(process.env.HOST_LAYOUT_JSON);
 for(var key in hostsLayout) {
-    var host = hostsLayout[key];
-    
-    var hostHandlers = [];
-    host.forEach(function(entry) {
-        hostHandlers.push([require(entry.handler), entry]);
-    });
-    delete host;
-    
-    var match = key.match(regexpWrap);
-    var flags = "i";
-    var hostLogger;
-    var pattern;
-    if(match) {
-        hostLogger = logger(match[1]);
-        pattern = match[1];
-    } else {
-        if(key == "*") {
-            fallback = hostHandlers;
-            continue;
-        }
-        
-        hostLogger = logger(key);
-        pattern = "^" + key.replace(/[\-\[\]\/\{\}\(\)\+\?\.\\\^\$\|]/g, "\\$&").replace(/\*/g, ".+") + "$";
-    }
-    
-    hostLogger.gears("Configuring", pattern, host);
-    var hostRouter = express.Router();
-    hostHandlers.forEach(function(handler) {
-        handler[0](hostRouter, handler[1], hostLogger);
-    });
-    app.use(vhost(new RegExp(pattern, flags), hostRouter));
+	(function(hostKey) {
+		var host = hostsLayout[hostKey];
+
+		var hostHandlers = [];
+		host.forEach(function(entry) {
+			hostHandlers.push([require(entry.handler), entry]);
+		});
+		delete host;
+
+		var match = hostKey.match(regexpWrap);
+		var flags = "i";
+		var hostLogger;
+		var pattern;
+		if(match) {
+			hostLogger = logger(match[1]);
+			pattern = match[1];
+		} else {
+			if(hostKey == "*") {
+				fallback = hostHandlers;
+				return;
+			}
+
+			hostLogger = logger(hostKey);
+			pattern = "^" + hostKey.replace(/[\-\[\]\/\{\}\(\)\+\?\.\\\^\$\|]/g, "\\$&").replace(/\*/g, ".+") + "$";
+		}
+
+		hostLogger.gears("Configuring", pattern, host);
+		var hostRouter = express.Router();
+		hostHandlers.forEach(function(handler) {
+			handler[0](hostRouter, handler[1], hostLogger);
+		});
+		app.use(vhost(new RegExp(pattern, flags), hostRouter));
+	})(key);
 }
 
 if(fallback) {
@@ -92,9 +94,6 @@ app.use(function(err, req, res, next) {
 	res.statusCode = 500;
 	res.write("<html><head><title>Error occured</title></head>");
 	res.write("<body>Oops, it looks like something went wrong.");
-	//res.write("<div style='font-size: 70%; margin: 12px'>Reference ");
-	//res.write(sha1.digest("hex"));
-	//res.write("</div>");
 	res.end("</body></html>");
 	
 	logger.error(err.stack);

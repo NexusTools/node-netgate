@@ -76,6 +76,8 @@ module.exports = function(config, readyCallback) {
         HOST_LAYOUT_JSON: JSON.stringify(hostsLayout),
         ROOT_PATH: rootPath
     };
+	if("env" in config)
+		_.extend(env, config.env);
     delete hostsLayout;
     
     masterLogger.info("Spawning workers");
