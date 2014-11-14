@@ -87,40 +87,88 @@ module.exports = function(config, readyCallback) {
         exec : path.resolve(__dirname, "worker", "loader.js"),
         silent : process.env.NETGATE_SILENCE_WORKERS
     });
-    
-    var listening = false;
-    var numCPUs = require('os').cpus().length;
-    for (var i = 0; i < numCPUs; i++) {
-        (function() {
-            var worker = cluster.fork(env);
-            var scope = "Worker" + worker.id;
-            var workerLogger = logger("Master", scope + " Monitor");
-            worker.on('online', function() {
-                workerLogger.info("Online");
-            });
-            worker.on('message', function(msg) {
-                //workerLogger.info(msg);
-                var scopes = msg[1] || [];
-                scopes.unshift(scope);
-                logger.log(msg[0], scopes, msg[2]);
-            });
-            worker.once('listening', function(address) {
-                if(listening)
-                    return;
-                
-                masterLogger.info("Ready for connections on", address.address, address.port);
-                readyCallback(undefined, address);
-                listening = true;
-            });
-            worker.on('error', function(err) {
-                workerLogger.info("Errored", err);
-            });
-            worker.on('exit', function(code) {
-                if(!listening)
-                    readyCallback(new Error("Worker exited before listening"));
-                
-                workerLogger.info("Exited", code);
-            });
-        })();
-    }
+	
+	var startup, workerCount = 0;
+    var listening = false, readyForConnections = false;
+    var workersLeft = Math.max(1, require('os').cpus().length);
+	var spawnWorker = function() {
+		if(workersLeft < 1)
+			return; // No workers left to spawn
+		workersLeft --;
+		
+		var worker = cluster.fork(env);
+		var scope = "Worker" + (++workerCount);
+		var workerLogger = logger("Master", scope + " Monitor");
+		worker.on('online', function() {
+			workerLogger.info("Online");
+		});
+		worker.on('message', function(msg) {
+			//workerLogger.info(msg);
+			var scopes = msg[1] || [];
+			scopes.unshift(scope);
+			logger.log(msg[0], scopes, msg[2]);
+		});
+		worker.once('listening', function(address) {
+			spawnWorker(); // Spawn another worker
+			
+			if(readyForConnections)
+				return;
+
+			startup.kill();
+			readyCallback(undefined, address);
+			readyForConnections = true;
+		});
+		worker.on('error', function(err) {
+			workerLogger.info("Errored", err);
+		});
+		worker.on('exit', function(code) {
+			if(!readyForConnections)
+				readyCallback(new Error("Worker exited before listening"));
+
+			workerLogger.info("Exited", code);
+		});
+	};
+	
+	startup = cluster.fork({
+        PROCESS_SEND_LOGGER: "true",
+        HOST_LAYOUT_JSON: JSON.stringify({
+			"*": [{
+				"handler": handlersLookup.resolve("logger.js")
+			},
+			{
+				"handler": handlersLookup.resolve("compression.js")
+			},
+			{
+				"handler": handlersLookup.resolve("startup.js")
+			}]
+		}),
+        ROOT_PATH: rootPath
+	});
+	var startupLogger = logger("Master", "Startup Monitor");
+	startup.on('online', function() {
+		startupLogger.info("Online");
+	});
+	startup.on('message', function(msg) {
+		//workerLogger.info(msg);
+		var scopes = msg[1] || [];
+		scopes.unshift("Startup");
+		logger.log(msg[0], scopes, msg[2]);
+	});
+	startup.once('listening', function(address) {
+		if(listening)
+			return;
+
+		startupLogger.info("Ready for connections on", address.address, address.port);
+		listening = true;
+		spawnWorker();
+	});
+	startup.on('error', function(err) {
+		startupLogger.info("Errored", err);
+	});
+	startup.on('exit', function(code) {
+		if(!listening)
+			readyCallback(new Error("Startup worker exited before listening"));
+
+		startupLogger.info("Exited", code);
+	});
 };

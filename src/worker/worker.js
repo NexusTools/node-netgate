@@ -6,7 +6,6 @@ var fs = require("fs");
 
 var topDir = path.dirname(path.dirname(__dirname));
 var patchDir = path.resolve(topDir, "patches");
-var handlerDir = path.resolve(topDir, "handlers");
 
 var applied = 0;
 logger.info("Running patches");
