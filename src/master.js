@@ -45,6 +45,8 @@ module.exports = function(config, readyCallback) {
             if(_.isObject(host) || _.isString(host))
                 host = [{
                     handler: "logger"
+                }, {
+                    handler: "compression"
                 }, host];
             else
                 throw new Error("Host value must be a `String`, `Array` or `Object`");
@@ -82,8 +84,8 @@ module.exports = function(config, readyCallback) {
     
     masterLogger.info("Spawning workers");
     cluster.setupMaster({
-        exec : path.resolve(__dirname, "worker.js"),
-        silent : true
+        exec : path.resolve(__dirname, "worker", "loader.js"),
+        silent : process.env.NETGATE_SILENCE_WORKERS
     });
     
     var listening = false;

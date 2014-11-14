@@ -1,21 +1,10 @@
 var logger = require("nulllogger");
-process.on('uncaughtException', function(err) {
-    try {
-        if(!err.stack)
-            throw "No Stack";
-        logger.error(err.stack);
-    } catch(e) {
-        logger.error("" + err);
-    }
-    process.exit(1);
-});
-
 var express = require("express");
 var vhost = require("vhost");
 var path = require("path");
 var fs = require("fs");
 
-var topDir = path.dirname(__dirname);
+var topDir = path.dirname(path.dirname(__dirname));
 var patchDir = path.resolve(topDir, "patches");
 var handlerDir = path.resolve(topDir, "handlers");
 
