@@ -9,6 +9,3 @@ process.env.HTTP_PORT = process.env.OPENSHIFT_NODEJS_PORT;
 process.env.HTTP_HOST = process.env.OPENSHIFT_NODEJS_IP;
 
 process.env.HTTP_TRUST_PROXY = true;
-
-// OpenShift requires a valid status code for haproxy
-process.env.HTTP_FALLBACK_CODE = 200;
