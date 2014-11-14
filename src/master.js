@@ -9,166 +9,190 @@ var masterLogger = logger("Master");
 var topDir = path.dirname(__dirname);
 var handlerBase = new paths(path.resolve(topDir, "handlers"));
 module.exports = function(config, readyCallback) {
-    readyCallback = readyCallback || _.noop;
-    
-    var rootPath;
-    if(!config || _.isString(config)) {
-        rootPath = path.resolve(config || require.main.id);
-        config = require(path.resolve(rootPath, "package.json"));
-    } else
-        rootPath = process.cwd();
-    masterLogger.info("Preparing", config.name, "V" + config.version);
-    if(config.description)
-        masterLogger.info("\t", config.description);
-    
-    var handlersLookup = handlerBase.get(path.resolve(rootPath, "handlers"));
-    if(config.wwwroot)
-        config.hosts = {
-            "*": config.wwwroot
-        };
-    else if(config.wwwapp)
-        config.hosts = {
-            "*": config.wwwapp
-        };
+	readyCallback = readyCallback || _.noop;
 
-    if(!config.hosts)
-        throw new Error("Expected `hosts` or `wwwroot` in configuration");
+	var rootPath;
+	if(!config || _.isString(config)) {
+		rootPath = path.resolve(config || require.main.id);
+		config = require(path.resolve(rootPath, "package.json"));
+	} else
+		rootPath = process.cwd();
+	masterLogger.info("Preparing", config.name, "V" + config.version);
+	if(config.description)
+		masterLogger.info("\t", config.description);
 
-    if(!_.isObject(config.hosts))
-        throw new Error("`hosts` must be an Object, where the key is a host pattern and the value is the host configuration");
-
-    var hostsLayout = {};
-    for(var key in config.hosts) {
-        var host = config.hosts[key];
-        
-        if(!_.isArray(host)) {
-            if(_.isObject(host) || _.isString(host))
-                host = [{
-                    handler: "logger"
-                }, {
-                    handler: "compression"
-                }, host];
-            else
-                throw new Error("Host value must be a `String`, `Array` or `Object`");
-        }
-
-        var handlers = [];
-        host.forEach(function(entry) {
-            if(_.isString(entry))
-                entry = {
-                    "handler": "static",
-                    "root": path.resolve(rootPath, entry)
-                };
-            else if(!entry.handler) {
-                if(entry.root)
-                    entry.handler = "static";
-                else
-                    throw new Error("Missing handler " + JSON.stringify(entry));
-            }
-            
-            entry.handler = handlersLookup.resolve(entry.handler + ".js");
-            handlers.push(entry);
-        });
-        
-        hostsLayout[key] = handlers;
-    }
-    delete config;
-    var env = {
-        PROCESS_SEND_LOGGER: "true",
-        HOST_LAYOUT_JSON: JSON.stringify(hostsLayout),
-        ROOT_PATH: rootPath
-    };
-	if("env" in config)
-		_.extend(env, config.env);
-    delete hostsLayout;
-    
-    masterLogger.info("Spawning workers");
-    cluster.setupMaster({
-        exec : path.resolve(__dirname, "worker", "loader.js"),
-        silent : process.env.NETGATE_SILENCE_WORKERS
-    });
+	var handlersLookup = handlerBase.get(path.resolve(rootPath, "handlers"));
 	
-	var startup, workerCount = 0;
-    var listening = false, readyForConnections = false;
-    var workersLeft = Math.max(1, require('os').cpus().length);
-	var spawnWorker = function() {
-		if(workersLeft < 1)
-			return; // No workers left to spawn
-		workersLeft --;
-		
-		var worker = cluster.fork(env);
-		var scope = "Worker" + (++workerCount);
-		var workerLogger = logger("Master", scope + " Monitor");
-		worker.on('online', function() {
-			workerLogger.info("Online");
+	var spawnStaticWorker = function(name, readyCallback) {
+		var staticWorker = cluster.fork({
+			PROCESS_SEND_LOGGER: "true",
+			HOST_LAYOUT_JSON: JSON.stringify({
+				"*": [{
+					"handler": handlersLookup.resolve("logger.js")
+				},
+				{
+					"handler": handlersLookup.resolve("compression.js")
+				},
+				{
+					"handler": handlersLookup.resolve("static.js"),
+					"root": path.resolve(topDir, "internal", name.toLowerCase())
+				}]
+			}),
+			ROOT_PATH: rootPath
 		});
-		worker.on('message', function(msg) {
+		var staticLogger = logger("Master", name + " Monitor");
+		staticWorker.on('online', function() {
+			staticLogger.info("Online");
+		});
+		staticWorker.on('message', function(msg) {
 			//workerLogger.info(msg);
 			var scopes = msg[1] || [];
-			scopes.unshift(scope);
+			scopes.unshift("Startup");
 			logger.log(msg[0], scopes, msg[2]);
 		});
-		worker.once('listening', function(address) {
-			spawnWorker(); // Spawn another worker
-			
-			if(readyForConnections)
+		staticWorker.once('listening', function(address) {
+			if(listening)
 				return;
 
-			startup.kill();
-			readyCallback(undefined, address);
-			readyForConnections = true;
-		});
-		worker.on('error', function(err) {
-			workerLogger.info("Errored", err);
-		});
-		worker.on('exit', function(code) {
-			if(!readyForConnections)
-				readyCallback(new Error("Worker exited before listening"));
+			staticLogger.info("Ready for connections on", address.address, address.port);
+			listening = true;
 
-			workerLogger.info("Exited", code);
+			if(readyCallback)
+				readyCallback();
 		});
+		staticWorker.on('error', function(err) {
+			staticLogger.info("Errored", err);
+		});
+		staticWorker.on('exit', function(code) {
+			if(!listening && readyCallback)
+				readyCallback(new Error(name+ "worker exited before listening"));
+
+			staticLogger.info("Exited", code);
+		});
+
+		return staticWorker;
 	};
 	
-	startup = cluster.fork({
-        PROCESS_SEND_LOGGER: "true",
-        HOST_LAYOUT_JSON: JSON.stringify({
-			"*": [{
-				"handler": handlersLookup.resolve("logger.js")
-			},
-			{
-				"handler": handlersLookup.resolve("compression.js")
-			},
-			{
-				"handler": handlersLookup.resolve("startup.js")
-			}]
-		}),
-        ROOT_PATH: rootPath
-	});
-	var startupLogger = logger("Master", "Startup Monitor");
-	startup.on('online', function() {
-		startupLogger.info("Online");
-	});
-	startup.on('message', function(msg) {
-		//workerLogger.info(msg);
-		var scopes = msg[1] || [];
-		scopes.unshift("Startup");
-		logger.log(msg[0], scopes, msg[2]);
-	});
-	startup.once('listening', function(address) {
-		if(listening)
-			return;
+	
+	try {
+		if(config.wwwroot)
+			config.hosts = {
+				"*": config.wwwroot
+			};
+		else if(config.wwwapp)
+			config.hosts = {
+				"*": config.wwwapp
+			};
 
-		startupLogger.info("Ready for connections on", address.address, address.port);
-		listening = true;
-		spawnWorker();
-	});
-	startup.on('error', function(err) {
-		startupLogger.info("Errored", err);
-	});
-	startup.on('exit', function(code) {
-		if(!listening)
-			readyCallback(new Error("Startup worker exited before listening"));
+		if(!config.hosts)
+			throw new Error("Expected `hosts` or `wwwroot` in configuration");
 
-		startupLogger.info("Exited", code);
-	});
+		if(!_.isObject(config.hosts))
+			throw new Error("`hosts` must be an Object, where the key is a host pattern and the value is the host configuration");
+
+		var hostsLayout = {};
+		for(var key in config.hosts) {
+			var host = config.hosts[key];
+
+			if(!_.isArray(host)) {
+				if(_.isObject(host) || _.isString(host))
+					host = [{
+						handler: "logger"
+					}, {
+						handler: "compression"
+					}, host];
+				else
+					throw new Error("Host value must be a `String`, `Array` or `Object`");
+			}
+
+			var handlers = [];
+			host.forEach(function(entry) {
+				if(_.isString(entry))
+					entry = {
+						"handler": "static",
+						"root": path.resolve(rootPath, entry)
+					};
+				else if(!entry.handler) {
+					if(entry.root)
+						entry.handler = "static";
+					else
+						throw new Error("Missing handler " + JSON.stringify(entry));
+				}
+
+				entry.handler = handlersLookup.resolve(entry.handler + ".js");
+				handlers.push(entry);
+			});
+
+			hostsLayout[key] = handlers;
+		}
+		delete config;
+		var env = {
+			PROCESS_SEND_LOGGER: "true",
+			HOST_LAYOUT_JSON: JSON.stringify(hostsLayout),
+			ROOT_PATH: rootPath
+		};
+		if("env" in config)
+			_.extend(env, config.env);
+		delete hostsLayout;
+
+		masterLogger.info("Spawning workers");
+		cluster.setupMaster({
+			exec : path.resolve(__dirname, "worker", "loader.js"),
+			silent : process.env.NETGATE_SILENCE_WORKERS
+		});
+
+		var startup, workerCount = 0;
+		var listening = false, readyForConnections = false;
+		var workersLeft = Math.max(1, require('os').cpus().length);
+		var spawnWorker = function() {
+			if(workersLeft < 1)
+				return; // No workers left to spawn
+			workersLeft --;
+
+			var worker = cluster.fork(env);
+			var scope = "Worker" + (++workerCount);
+			var workerLogger = logger("Master", scope + " Monitor");
+			worker.on('online', function() {
+				workerLogger.info("Online");
+			});
+			worker.on('message', function(msg) {
+				//workerLogger.info(msg);
+				var scopes = msg[1] || [];
+				scopes.unshift(scope);
+				logger.log(msg[0], scopes, msg[2]);
+			});
+			worker.once('listening', function(address) {
+				spawnWorker(); // Spawn another worker
+
+				if(readyForConnections)
+					return;
+
+				startup.kill();
+				readyCallback(undefined, address);
+				readyForConnections = true;
+			});
+			worker.on('error', function(err) {
+				workerLogger.info("Errored", err);
+			});
+			worker.on('exit', function(code) {
+				if(!readyForConnections) {
+					startup.kill();
+					spawnStaticWorker("Failure");
+					readyCallback(new Error("Worker exited before listening"));
+				}
+
+				workerLogger.info("Exited", code);
+			});
+		};
+
+		startup = spawnStaticWorker("Startup", function(err) {
+			if(err)
+				readyCallback(err);
+			else
+				spawnWorker();
+		});
+	} catch(e) {
+		logger.fatal(e);
+		spawnStaticWorker("Failure");
+	}
 };

@@ -70,7 +70,7 @@ if(fallback) {
 
 var fallbackCode = process.env.HTTP_FALLBACK_CODE || 404;
 app.use(function(req, res) {
-    logger.warn("Unhandled, sending", fallbackCode, "status code", req.host, req.url);
+    logger.warn("Unhandled, sending", fallbackCode, "status code", req.hostname, req.url);
     res.sendStatus(fallbackCode);
 });
 
