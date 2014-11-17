@@ -263,6 +263,13 @@ module.exports = function(messageRouter) {
 
 			var lastPart = null, next;
 			var router = express.Router();
+			router.use(function netgate_logger(req, res, next) {
+				if("user-agent" in req.headers)
+					host.logger.info(req.method, req.hostname, req.url, "from", req.ip, req.headers['user-agent']);
+				else
+					host.logger.info(req.method, req.hostname, req.url, "from", req.ip);
+				next();
+			});
 			var install = function(config, part) {
 				host.logger.gears("Installing handler...", _.keys(config));
 
@@ -422,5 +429,6 @@ module.exports = function(messageRouter) {
 			onlisten(e);
 		}
 	});
+	logger.info("Sending ReadyToListen");
 	messageRouter.send("ReadyToListen", true);
 };

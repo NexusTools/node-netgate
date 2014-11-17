@@ -47,7 +47,7 @@ module.exports = function(config, readyCallback) {
 				if(!worker.ready) {
 					worker.ready = true;
 					if(callback)
-						callback("Exited with code " + code);
+						callback(new Error("Exited with code " + code));
 				}
 
 				worker.logger.info("Exited", code);
@@ -92,9 +92,6 @@ module.exports = function(config, readyCallback) {
 			PROCESS_SEND_LOGGER: "true",
 			HOST_LAYOUT_JSON: JSON.stringify({
 				"*": [{
-					"handler": handlersLookup.resolve("logger.js")
-				},
-				{
 					"handler": handlersLookup.resolve("compression.js")
 				},
 				{
@@ -104,12 +101,16 @@ module.exports = function(config, readyCallback) {
 			}),
 			ROOT_PATH: rootPath
 		}, name, function(err) {
+			if(!callback)
+				return;
+			
 			if(err)
 				callback(new Error("`" + cleanName + "` failed to start: " + err));
-			else
-				callback();
+			//else
+			//	callback();
 		});
 		worker.messageRouter.receive("ReadyToListen", function(message) {
+			logger.info("StartListening");
 			worker.messageRouter.send("StartListening", true);
 		});
 		
@@ -140,8 +141,6 @@ module.exports = function(config, readyCallback) {
 			if(!_.isArray(host)) {
 				if(_.isObject(host) || _.isString(host))
 					host = [{
-						handler: "logger"
-					}, {
 						handler: "compression"
 					}, host];
 				else
@@ -184,7 +183,7 @@ module.exports = function(config, readyCallback) {
 			silent : process.env.NETGATE_SILENCE_WORKERS
 		});
 
-		var startup, workerCount = 0;
+		var workerCount = 0;
 		var listening = false, readyForConnections = false;
 		var workersLeft = Math.max(1, require('os').cpus().length);
 		var spawnWorker = function() {
@@ -198,7 +197,7 @@ module.exports = function(config, readyCallback) {
 					worker = forkWorker("webhost", env, "Worker" + (++workerCount), function(err) {
 						if(err)
 							readyCallback(new Error("`" + cleanName + "` failed to start: " + err));
-						else {
+					 	else {
 							spawnWorker();
 							setTimeout(readyCallback, 200);
 						}
@@ -217,12 +216,6 @@ module.exports = function(config, readyCallback) {
 				
 				worker.once('listening', function(address) {
 					logger.info("Ready for connections", address.address, ""+address.port);
-					
-					// Delay killing
-					process.nextTick(function() {
-						startup.kill();
-					});
-					delete startup;
 				});
 			} else {
 				if(workersLeft > 0)
@@ -251,12 +244,7 @@ module.exports = function(config, readyCallback) {
 			}
 		};
 
-		startup = spawnStaticWorker("Y:Startup", function(err) {
-			if(err)
-				readyCallback(err);
-			else
-				spawnWorker();
-		});
+		spawnWorker();
 	} catch(e) {
 		logger.fatal(e);
 		spawnStaticWorker("R:Failure");
