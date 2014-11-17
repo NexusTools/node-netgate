@@ -38,8 +38,6 @@ describe("api", function() {
                     done(e);
                 }
             });
-                
-            //done();
         }).on('error', function(e) {
             done(e);
         });

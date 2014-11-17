@@ -1,11 +1,8 @@
-module.exports = function(app, config) {
-	config.code = config.code || 404;
-	var handler = function(req, res) {
-		res.sendStatus(config.code);
-	};
-	
-	if(config.path)
-		app.use(config.path, handler);
-	else
-		app.use(handler);
+module.exports = {
+	postroute: function(config) {
+		var code = config.code || 404;
+		return function netgate_status_response(req, res) {
+			res.sendStatus(code);
+		};
+	}
 }

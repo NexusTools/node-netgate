@@ -1,13 +1,17 @@
 var express = require("express");
 
-module.exports = function(app, config) {
+module.exports = function(config, logger) {
     if(!config.root)
         throw new Error("Handler `static` requires `root` parameter");
     
+	logger.gears("Static route on path", config.root);
+	var static = express.static(config.root);
     if(!config.noRewrite) {
+		var router = express.Router();
+		
         var fs = require("fs");
         var path = require("path");
-        app.use(function(req, res, next) {
+        router.use(function netgate_index_redirect(req, res, next) {
             var subpath = req.path;
             var pos = subpath.indexOf("?");
             if(pos != -1)
@@ -32,11 +36,9 @@ module.exports = function(app, config) {
           } else
             next();
         });
-    }
-    
-    var handler = express.static(config.root);
-    if(config.path)
-        app.use(config.path, handler);
-    else
-        app.use(handler);
+		
+		router.use(static);
+		return router;
+    } else
+		return static;
 };

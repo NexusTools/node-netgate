@@ -1,40 +1,24 @@
 var endSlash = /\/$/;
-module.exports = function(app, config, logger) {
+module.exports = function(config, logger) {
     if(!config.to)
         throw new Error("Handler `redirect` requires `to` parameter");
     
     var redirect;
-	if(config.stripURL) {
-		if(config.code)
-			redirect = function(req, res) {
-				logger.info("Redirecting to", config.to, config.code);
-				res.redirect(config.code, config.to);
-			};
-		else
-			redirect = function(req, res) {
-				logger.info("Redirecting to", config.to);
-				res.redirect(config.to);
-			};
-	} else {
-		if(endSlash.test(config.to))
-			config.to = config.to.substring(0, config.to.length-1);
+	var to = config.to;
+	var code = config.code || 302;
+	if(config.stripURL)
+		return function netgate_redirect(req, res) {
+			logger.info("Redirecting to", to, code);
+			res.redirect(code, to);
+		};
+	else {
+		if(endSlash.test(to))
+			to = to.substring(0, to.length-1);
 		
-		if(config.code)
-			redirect = function(req, res) {
-				var to = config.to + req.url;
-				logger.info("Redirecting to", to, config.code);
-				res.redirect(config.code, to);
-			};
-		else
-			redirect = function(req, res) {
-				var to = config.to + req.url;
-				logger.info("Redirecting to", to);
-				res.redirect(to);
-			};
+		return function netgate_redirect(req, res) {
+			var concat = to + req.url;
+			logger.info("Redirecting to", concat, code);
+			res.redirect(code, concat);
+		};
 	}
-    
-    if(config.path)
-        app.use(config.path, redirect);
-    else
-        app.use(redirect);
 };

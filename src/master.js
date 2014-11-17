@@ -5,8 +5,9 @@ var _ = require("underscore");
 var path = require("path");
 var fs = require("fs");
 
-var masterLogger = logger("Master");
+var masterLogger = logger("cyan:Master");
 var topDir = path.dirname(__dirname);
+var MessageRouter = require(path.resolve(__dirname, "messagerouter.js"));
 var handlerBase = new paths(path.resolve(topDir, "handlers"));
 module.exports = function(config, readyCallback) {
 	readyCallback = readyCallback || _.noop;
@@ -17,14 +18,77 @@ module.exports = function(config, readyCallback) {
 		config = require(path.resolve(rootPath, "package.json"));
 	} else
 		rootPath = process.cwd();
+	
 	masterLogger.info("Preparing", config.name, "V" + config.version);
 	if(config.description)
 		masterLogger.info("\t", config.description);
 
 	var handlersLookup = handlerBase.get(path.resolve(rootPath, "handlers"));
 	
-	var spawnStaticWorker = function(name, readyCallback) {
-		var staticWorker = cluster.fork({
+	var forkedWorkers = 0;
+	var forkWorker = function(type, env, name, callback) {
+		var worker = cluster.fork(env);
+		worker.logger = logger("cyan:Master", name + " Monitor");
+		worker.on('online', function() {
+			worker.logger.info("Online");
+			forkedWorkers ++;
+		});
+		
+		worker.on('error', function(err) {
+			if(!worker.ready) {
+				worker.ready = true;
+				if(callback)
+					callback(err);
+			}
+			worker.logger.info("Errored", err);
+		});
+		worker.on('exit', function(code) {
+			try {
+				if(!worker.ready) {
+					worker.ready = true;
+					if(callback)
+						callback("Exited with code " + code);
+				}
+
+				worker.logger.info("Exited", code);
+			} finally {
+				if(forkedWorkers < 1)
+					process.exit(0);
+			}
+		});
+		
+		worker.messageRouter = new MessageRouter(function(callback) {
+			worker.on('message', callback);
+		}, function(message) {
+			worker.send(message);
+		}, worker.logger);
+		
+		var scopeName = logger.cleanScope(name);
+		worker.messageRouter.receive("Logger", function(message) {
+			message[1].unshift(scopeName); // Inject name into scopes
+			logger.log0.apply(undefined, message);
+		});
+		if(callback)
+			worker.messageRouter.receive("FullyConfigured", function(message) {
+				worker.logger.debug("FullyConfigured");
+				if(!worker.ready) {
+					worker.ready = true;
+					callback();
+				}
+			});
+		else
+			worker.messageRouter.receive("FullyConfigured", function(message) {
+				worker.logger.debug("FullyConfigured");
+			});
+
+		return worker;
+	}
+	var spawnStaticWorker = function(name, callback) {
+		var cleanName = name;
+		var pos = cleanName.indexOf(":");
+		if(pos > -1)
+			cleanName = cleanName.substring(pos+1);
+		var worker = forkWorker("webhost", {
 			PROCESS_SEND_LOGGER: "true",
 			HOST_LAYOUT_JSON: JSON.stringify({
 				"*": [{
@@ -35,42 +99,21 @@ module.exports = function(config, readyCallback) {
 				},
 				{
 					"handler": handlersLookup.resolve("static.js"),
-					"root": path.resolve(topDir, "internal", name.toLowerCase())
+					"root": path.resolve(topDir, "internal", cleanName.toLowerCase())
 				}]
 			}),
 			ROOT_PATH: rootPath
+		}, name, function(err) {
+			if(err)
+				callback(new Error("`" + cleanName + "` failed to start: " + err));
+			else
+				callback();
 		});
-		var staticLogger = logger("Master", name + " Monitor");
-		staticWorker.on('online', function() {
-			staticLogger.info("Online");
+		worker.messageRouter.receive("ReadyToListen", function(message) {
+			worker.messageRouter.send("StartListening", true);
 		});
-		staticWorker.on('message', function(msg) {
-			//workerLogger.info(msg);
-			var scopes = msg[1] || [];
-			scopes.unshift("Startup");
-			logger.log(msg[0], scopes, msg[2]);
-		});
-		staticWorker.once('listening', function(address) {
-			if(listening)
-				return;
-
-			staticLogger.info("Ready for connections on", address.address, address.port);
-			listening = true;
-
-			if(readyCallback)
-				readyCallback();
-		});
-		staticWorker.on('error', function(err) {
-			staticLogger.info("Errored", err);
-		});
-		staticWorker.on('exit', function(code) {
-			if(!listening && readyCallback)
-				readyCallback(new Error(name+ "worker exited before listening"));
-
-			staticLogger.info("Exited", code);
-		});
-
-		return staticWorker;
+		
+		return worker;
 	};
 	
 	
@@ -137,7 +180,7 @@ module.exports = function(config, readyCallback) {
 
 		masterLogger.info("Spawning workers");
 		cluster.setupMaster({
-			exec : path.resolve(__dirname, "worker", "loader.js"),
+			exec : path.resolve(__dirname, "loader.js"),
 			silent : process.env.NETGATE_SILENCE_WORKERS
 		});
 
@@ -149,43 +192,63 @@ module.exports = function(config, readyCallback) {
 				return; // No workers left to spawn
 			workersLeft --;
 
-			var worker = cluster.fork(env);
-			var scope = "Worker" + (++workerCount);
-			var workerLogger = logger("Master", scope + " Monitor");
-			worker.on('online', function() {
-				workerLogger.info("Online");
-			});
-			worker.on('message', function(msg) {
-				//workerLogger.info(msg);
-				var scopes = msg[1] || [];
-				scopes.unshift(scope);
-				logger.log(msg[0], scopes, msg[2]);
-			});
-			worker.once('listening', function(address) {
-				spawnWorker(); // Spawn another worker
-
-				if(readyForConnections)
-					return;
-
-				startup.kill();
-				readyCallback(undefined, address);
-				readyForConnections = true;
-			});
-			worker.on('error', function(err) {
-				workerLogger.info("Errored", err);
-			});
-			worker.on('exit', function(code) {
-				if(!readyForConnections) {
+			var worker;
+			if(workerCount == 1) {
+				if(workersLeft > 0)
+					worker = forkWorker("webhost", env, "Worker" + (++workerCount), function(err) {
+						if(err)
+							readyCallback(new Error("`" + cleanName + "` failed to start: " + err));
+						else {
+							spawnWorker();
+							setTimeout(readyCallback, 200);
+						}
+					});
+				else
+					worker = forkWorker("webhost", env, "Worker" + (++workerCount), function(err) {
+						if(err)
+							readyCallback(new Error("`" + cleanName + "` failed to start: " + err));
+						else
+							spawnWorker();
+					});
+				
+				worker.messageRouter.receive("ReadyToListen", function(message) {
+					worker.messageRouter.send("StartListening", true);
+				});
+				
+				worker.once('listening', function(address) {
+					logger.info("Ready for connections", address.address, ""+address.port);
+					
 					startup.kill();
-					spawnStaticWorker("Failure");
-					readyCallback(new Error("Worker exited before listening"));
-				}
+					delete startup;
+				});
+			} else {
+				if(workersLeft > 0)
+					worker = forkWorker("webhost", env, "Worker" + (++workerCount), function(err) {
+						if(!err)
+							worker.messageRouter.send("StartListening", true);
+						else
+							try {
+								worker.kill();
+							} catch(e) {}
 
-				workerLogger.info("Exited", code);
-			});
+						spawnWorker();
+					});
+				else
+					worker = forkWorker("webhost", env, "Worker" + (++workerCount), function(err) {
+						if(!err)
+							worker.messageRouter.send("StartListening", true);
+						else
+							try {
+								worker.kill();
+							} catch(e) {}
+
+						masterLogger.info("All workers spawned");
+					});
+				worker.messageRouter.receive("ReadyToListen", function(message) {});
+			}
 		};
 
-		startup = spawnStaticWorker("Startup", function(err) {
+		startup = spawnStaticWorker("Y:Startup", function(err) {
 			if(err)
 				readyCallback(err);
 			else
@@ -193,6 +256,6 @@ module.exports = function(config, readyCallback) {
 		});
 	} catch(e) {
 		logger.fatal(e);
-		spawnStaticWorker("Failure");
+		spawnStaticWorker("R:Failure");
 	}
 };
