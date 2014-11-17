@@ -9,3 +9,4 @@ process.env.HTTP_PORT = process.env.OPENSHIFT_NODEJS_PORT;
 process.env.HTTP_HOST = process.env.OPENSHIFT_NODEJS_IP;
 
 process.env.HTTP_TRUST_PROXY = true;
+process.env.NO_HEAVY_LIFTING = true;
