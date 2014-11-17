@@ -327,14 +327,6 @@ module.exports = function(messageRouter) {
 			}
 		}
 		
-		var match = host.key.match(regexpWrap);
-		var flags = "i";
-		var pattern;
-		if(match)
-			pattern = match[1];
-		else
-			pattern = "^" + host.key.replace(/[\-\[\]\/\{\}\(\)\+\?\.\\\^\$\|]/g, "\\$&").replace(/\*/g, ".+") + "$";
-		
 		if(host.configured) {
 			host.logger.debug("Configured before adding to app router!");
 			if(host.configured instanceof Error)
@@ -383,7 +375,19 @@ module.exports = function(messageRouter) {
 			});
 		}
 		
-		app.use(vhost(new RegExp(pattern, flags), router));
+		if(host.key == "*")
+			app.use(router);
+		else {
+			var match = host.key.match(regexpWrap);
+			var flags = "i";
+			var pattern;
+			if(match)
+				pattern = match[1];
+			else
+				pattern = "^" + host.key.replace(/[\-\[\]\/\{\}\(\)\+\?\.\\\^\$\|]/g, "\\$&").replace(/\*/g, ".+") + "$";
+
+			app.use(vhost(new RegExp(pattern, flags), router));
+		}
 	});
 	
 	var onlisten = function(err) {
