@@ -218,7 +218,10 @@ module.exports = function(config, readyCallback) {
 				worker.once('listening', function(address) {
 					logger.info("Ready for connections", address.address, ""+address.port);
 					
-					startup.kill();
+					// Delay killing
+					setTimeout(function() {
+						startup.kill();
+					}, 200);
 					delete startup;
 				});
 			} else {
