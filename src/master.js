@@ -219,9 +219,9 @@ module.exports = function(config, readyCallback) {
 					logger.info("Ready for connections", address.address, ""+address.port);
 					
 					// Delay killing
-					setTimeout(function() {
+					process.nextTick(function() {
 						startup.kill();
-					}, 200);
+					});
 					delete startup;
 				});
 			} else {
