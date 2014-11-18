@@ -262,22 +262,28 @@ module.exports = function(messageRouter) {
 			host.logger.debug("Configuring", host.parts.length, host.parts.length>1 ? "parts" : "part");
 
 			var lastPart = null, next;
-			var router = express.Router();
-			router.use(function netgate_logger(req, res, next) {
+			var router = express.Router(), partsRouter = express.Router();
+			router.use(function netgate_initializer(req, res, next) {
+				var _d = domain.create();
+				_d.add(req);
+				_d.add(res);
+				
+				_d.on("error", function(err) {
+					next(err);
+				});
 				if("user-agent" in req.headers)
 					host.logger.info(req.method, req.hostname, req.url, "from", req.ip, req.headers['user-agent']);
 				else
 					host.logger.info(req.method, req.hostname, req.url, "from", req.ip);
-				next();
+				_d.run(next);
 			});
 			var install = function(config, part) {
-				host.logger.gears("Installing handler...", _.keys(config));
-
 				var type = config.type || "use";
+				host.logger.debug("Installing handler...", _.keys(config), type, config.path);
 				if("path" in config)
-					router[type](config.path, part);
+					partsRouter[type](config.path, part);
 				else
-					router[type](part);
+					partsRouter[type](part);
 
 				host.logger.gears("installed", type, config.path);
 			}
@@ -331,44 +337,50 @@ module.exports = function(messageRouter) {
 			host.logger.debug("Configured before adding to app router!");
 			if(host.configured instanceof Error)
 				router.use(failure);
+			else
+				router.use(partsRouter);
 		} else {
 			host.logger.debug("Not configured yet...");
 			
-			var routerStack, partsRouter = router;
-			routerStack = [function(req, res, next) {
+			var stack, deleteStartup = true, deleteFailure = true;
+			stack = [function failure(req, res, next) {
 				if(host.errored)
 					failure(req, res);
 				else {
-					routerStack.shift();
+					if(host.configured && deleteFailure) {
+						deleteFailure = false;
+						stack.shift();
+					}
 					next();
 				}
-			}, partsRouter, function(req, res, next) {
+			}, partsRouter, function startup(req, res, next) {
 				if(host.configured) {
-					routerStack.pop();
+					if(deleteStartup) {
+						deleteStartup = false;
+						stack.pop();
+					}
 					next();
 				} else
 					startup(req, res);
 			}];
-			router.use(function(req, res, next) {
-				var i = 0;
-				var __next;
-				__next = function() {
-					var part = routerStack[i++];
-					host.logger.debug("Slow handler", part.name);
-					part(req, res, i < routerStack.length ? __next : next);
-				};
-				__next();
-			});
-			["use", "post", "get"].forEach(function(type) {
-				router[type] = function() {
-					partsRouter[type].apply(partsRouter, arguments);
-				};
+			router.use(function slow_handler(req, res, next) {
+				if(stack.length > 1) {
+					var parts = stack.slice(0), _next;
+					_next = function() {
+						var part = parts.shift();
+						host.logger.info(part.name);
+						part(req, res, parts.length > 0 ? _next : next);
+					}
+					_next();
+				} else
+					stack[0](req, res, next);
 			});
 		}
-		router.use(function(req, res) {
+		router.use(function netgate_notfound(req, res) {
 			host.logger.debug("Sending 404 response");
 			res.sendStatus(404);
 		});
+		host.logger.debug("Router configured", router.stack);
 		
 		if(host.key == "*")
 			app.use(router);

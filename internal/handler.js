@@ -15,7 +15,7 @@ module.exports = function(config) {
 	};
 	
 	var code = config.code || 500;
-	return function(req, res) {
+	return function netgate_internal(req, res) {
 		try {
 			res.writeHeader(code, headers);
 		} catch(e) {}

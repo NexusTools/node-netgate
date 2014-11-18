@@ -15,13 +15,7 @@ var messageRouter = new messageRouter(function(callback) {
 });
 
 process.on('uncaughtException', function(err) {
-	try {
-		if(!("stack" in err))
-			throw "No stack";
-		logger.fatal(err.stack);
-	} catch(e) {
-		logger.fatal(err);
-	}
+	logger.fatal("Unhandled exception:", err);
 	process.exit(1);
 });
 
