@@ -217,7 +217,7 @@ module.exports = function(config, readyCallback) {
 				});
 				
 				worker.once('listening', function(address) {
-					logger.info("Ready for connections", address.address, ""+address.port);
+					logger.info("Ready for connections", address.address, address.port);
 				});
 			} else {
 				if(workersLeft > 0)
