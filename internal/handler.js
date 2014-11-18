@@ -1,10 +1,10 @@
 var cache = {};
 
 module.exports = function(config) {
-	if(!config.type)
+	if(!config.path)
 		throw new Error("A file to display is required");
 	
-	var path = require("path").resolve(__dirname, type, "index.html");
+	var path = require("path").resolve(__dirname, config.path + ".html");
 	if(!(path in cache))
 		cache[path] = require("fs").readFileSync(path, {encoding:"utf8"});
 	
@@ -14,9 +14,11 @@ module.exports = function(config) {
 		"Content-Length": data.length
 	};
 	
-	var code = config.code || 503;
+	var code = config.code || 500;
 	return function(req, res) {
-		res.writeHeader(code, headers);
+		try {
+			res.writeHeader(code, headers);
+		} catch(e) {}
 		res.end(data);
 	};
 }

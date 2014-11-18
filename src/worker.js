@@ -1,6 +1,6 @@
 var $break = new Object();
 var regexpWrap = /^\/(.+)\/$/;
-module.exports = function(messageRouter) {
+module.exports = function(opts) {
 	var logger = require("nulllogger");
 	var express = require("express");
 	var domain =  require('domain');
@@ -13,10 +13,6 @@ module.exports = function(messageRouter) {
 	var topDir = path.dirname(upDir);
 	var patchDir = path.resolve(topDir, "patches");
 	var argnames = require(path.resolve(upDir, "argnames.js"));
-	var internal = require(path.resolve(topDir, "internal", "handler.js"));
-	var startup = internal({path: "startup",code:503});
-	var failure = internal({"path":"failure"});
-	var error = internal({"path":"error"});
 
 	var applied = 0;
 	logger.debug("Running patches...");

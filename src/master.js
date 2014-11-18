@@ -110,7 +110,7 @@ module.exports = function(config, readyCallback) {
 			//	callback();
 		});
 		worker.messageRouter.receive("ReadyToListen", function(message) {
-			logger.info("StartListening");
+			logger.debug("Sending StartListening");
 			worker.messageRouter.send("StartListening", true);
 		});
 		
@@ -192,11 +192,11 @@ module.exports = function(config, readyCallback) {
 			workersLeft --;
 
 			var worker;
-			if(workerCount == 1) {
+			if(workerCount == 0) {
 				if(workersLeft > 0)
 					worker = forkWorker("webhost", env, "Worker" + (++workerCount), function(err) {
 						if(err)
-							readyCallback(new Error("`" + cleanName + "` failed to start: " + err));
+							readyCallback(err);
 					 	else {
 							spawnWorker();
 							setTimeout(readyCallback, 200);
@@ -205,12 +205,14 @@ module.exports = function(config, readyCallback) {
 				else
 					worker = forkWorker("webhost", env, "Worker" + (++workerCount), function(err) {
 						if(err)
-							readyCallback(new Error("`" + cleanName + "` failed to start: " + err));
+							readyCallback(err);
 						else
 							spawnWorker();
 					});
 				
+				
 				worker.messageRouter.receive("ReadyToListen", function(message) {
+					logger.debug("Sending StartListening");
 					worker.messageRouter.send("StartListening", true);
 				});
 				

@@ -12,9 +12,21 @@ function MessageRouter(receive, send, logger) {
 				throw new Error("Missing receiver: " + JSON.stringify(message));
 			
 			if("response" in message) {
-
+				throw new Error("No request: " + message.response);
 			} else if("request" in message) {
+				var respond = function(response) {
+					response.receiver = message.receiver;
+					response.response = message.request;
+					__send.send(response);
+				};
 				
+				if(message.receiver in self.__handlers)
+					self.__handlers[message.receiver](message.data, respond);
+				else {
+					var err = "No handler installed for: " + message.receiver;
+					logger.warning(err);
+					respond({error:err});
+				}
 			} else {
 				if(message.receiver in self.__receivers)
 					self.__receivers[message.receiver](message.data);
