@@ -330,47 +330,45 @@ module.exports = function(messageRouter) {
 		if(host.configured) {
 			host.logger.debug("Configured before adding to app router!");
 			if(host.configured instanceof Error)
-				router = failure;
-			else
-				router.use(function(req, res) {
-					host.logger.debug("Sending 404 response");
-					res.sendStatus(404);
-				});
+				router.use(failure);
 		} else {
 			host.logger.debug("Not configured yet...");
 			
 			var routerStack, partsRouter = router;
 			routerStack = [function(req, res, next) {
-				if(host.errored) {
+				if(host.errored)
+					failure(req, res);
+				else {
 					routerStack.shift();
-					error(req, res);
-				} else
 					next();
-				
-			}, partsRouter, function(req, res) {
+				}
+			}, partsRouter, function(req, res, next) {
 				if(host.configured) {
 					routerStack.pop();
-					host.logger.debug("Sending 404 response");
-					res.sendStatus(404);
+					next();
 				} else
 					startup(req, res);
 			}];
-			router = function(req, res) {
+			router.use(function(req, res, next) {
 				var i = 0;
 				var __next;
 				__next = function() {
 					var part = routerStack[i++];
 					host.logger.debug("Slow handler", part.name);
-					part(req, res, __next);
+					part(req, res, i < routerStack.length ? __next : next);
 				};
 				__next();
-			};
+			});
 			["use", "post", "get"].forEach(function(type) {
 				router[type] = function() {
 					partsRouter[type].apply(partsRouter, arguments);
 				};
 			});
 		}
+		router.use(function(req, res) {
+			host.logger.debug("Sending 404 response");
+			res.sendStatus(404);
+		});
 		
 		if(host.key == "*")
 			app.use(router);
