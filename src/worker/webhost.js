@@ -126,7 +126,7 @@ module.exports = function(messageRouter) {
 					
 					if(--hostsToConfigure < 1)
 						messageRouter.send("FullyConfigured", true);
-					_logger.debug("Configured", ""+hostsToConfigure);
+					_logger.debug("Configured", hostsToConfigure);
 					
 					if(err) {
 						_logger.error(err);
@@ -214,7 +214,7 @@ module.exports = function(messageRouter) {
 
 					if(host.handlers.length > 0) {
 						host.parts = [];
-						_logger.gears("Processing", ""+host.handlers.length, host.handlers.length>1 ? "handlers" : "handler");
+						_logger.gears("Processing", host.handlers.length, host.handlers.length>1 ? "handlers" : "handler");
 						host.handlers.forEach(function(handler) {
 							var consts = {};
 							_.extend(consts, constants);
@@ -234,7 +234,7 @@ module.exports = function(messageRouter) {
 							});
 						}
 						delete host.handlers;
-						_logger.debug("Found", ""+host.parts.length, host.parts.length>1 ? "parts" : "parts");
+						_logger.debug("Found", host.parts.length, host.parts.length>1 ? "parts" : "parts");
 					} else
 						throw new Error("No usable parts configured");
 				});
@@ -253,13 +253,13 @@ module.exports = function(messageRouter) {
 		hosts.push(fallback);
 	
 	if(hosts.length > 0)
-		logger.info("Configuring", ""+hosts.length, hosts.length > 1 ? "hosts" : "host");
+		logger.info("Configuring", hosts.length, hosts.length > 1 ? "hosts" : "host");
 	else
 		throw new Error("No hosts to configure.");
 	
 	hosts.forEach(function(host) {
 		if(!host.configured) {
-			host.logger.debug("Configuring", ""+host.parts.length, host.parts.length>1 ? "parts" : "part");
+			host.logger.debug("Configuring", host.parts.length, host.parts.length>1 ? "parts" : "part");
 
 			var lastPart = null, next;
 			var router = express.Router();
@@ -390,16 +390,16 @@ module.exports = function(messageRouter) {
 	var onlisten = function(err) {
 		if(err) {
 			if(process.env.HTTP_HOST)
-				logger.debug("Failed to listen on", process.env.HTTP_HOST, ""+process.env.HTTP_PORT);
+				logger.debug("Failed to listen on", process.env.HTTP_HOST, process.env.HTTP_PORT);
 			else
-				logger.debug("Failed to listen on", ""+process.env.HTTP_PORT);
+				logger.debug("Failed to listen on", process.env.HTTP_PORT);
 			throw err;
 		}
 		
 		if(process.env.HTTP_HOST)
-			logger.debug("Ready for Connections on", process.env.HTTP_HOST, ""+process.env.HTTP_PORT);
+			logger.debug("Ready for Connections on", process.env.HTTP_HOST, process.env.HTTP_PORT);
 		else
-			logger.debug("Ready for Connections on", ""+process.env.HTTP_PORT);
+			logger.debug("Ready for Connections on", process.env.HTTP_PORT);
 	};
 	
 	//var crypto = require("crypto");
