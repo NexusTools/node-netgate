@@ -291,7 +291,7 @@ module.exports = function(messageRouter) {
 				host.domain.run(function() {
 					if(part) {
 						if(part instanceof Error)
-							throw handler;
+							throw part;
 
 						host.logger.debug("Installing", lastPart[3], part.name);
 						install(lastPart[2].config, part);
