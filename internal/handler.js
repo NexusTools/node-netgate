@@ -1,3 +1,4 @@
+var logger = require("nulllogger");
 var cache = {};
 
 module.exports = function(config) {
@@ -18,7 +19,13 @@ module.exports = function(config) {
 	return function netgate_internal(req, res) {
 		try {
 			res.writeHeader(code, headers);
-		} catch(e) {}
-		res.end(data);
+		} catch(e) {
+            logger.warning(e);
+        }
+		try {
+            res.end(data);
+		} catch(e) {
+            logger.error(e);
+        }
 	};
 }

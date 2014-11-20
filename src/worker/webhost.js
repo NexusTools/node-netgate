@@ -268,14 +268,32 @@ module.exports = function(messageRouter) {
 				_d.add(req);
 				_d.add(res);
 				
+                _d.logger = logger(host.logger._scopes[0], req.url);
 				_d.on("error", function(err) {
-					next(err);
+                    _d.logger.error("Uncaught Error", err);
+				    //next(err || new Error("Uncaught Error"));
+                    try {
+                        error(req, res);
+                    } catch(e) {}
 				});
-				if("user-agent" in req.headers)
-					host.logger.info(req.method, req.hostname, req.url, "from", req.ip, req.headers['user-agent']);
-				else
-					host.logger.info(req.method, req.hostname, req.url, "from", req.ip);
-				_d.run(next);
+                _d.run(function() {
+                    if("user-agent" in req.headers)
+                        _d.logger.info(req.method, req.hostname, req.url, "from", req.ip, req.headers['user-agent']);
+                    else
+                        _d.logger.info(req.method, req.hostname, req.url, "from", req.ip);
+                    
+                    if(process.env.DEBUG_HANDLERS)
+                        ["writeHead", "setHeader", "end"].forEach(function(method) {
+                            var orig = res[method];
+                            res[method] = function() {
+                                _d.logger.info((new Error("Called " + method)).stack.substring(7));
+                                orig.apply(this, arguments);
+                            }
+                        });
+                    
+                    next();
+                });
+				
 			});
 			var install = function(config, part) {
 				var type = config.type || "use";
@@ -368,7 +386,7 @@ module.exports = function(messageRouter) {
 					var parts = stack.slice(0), _next;
 					_next = function() {
 						var part = parts.shift();
-						host.logger.info(part.name);
+						process.domain.logger.info("Part", part.name, parts.length);
 						part(req, res, parts.length > 0 ? _next : next);
 					}
 					_next();
@@ -377,7 +395,7 @@ module.exports = function(messageRouter) {
 			});
 		}
 		router.use(function netgate_notfound(req, res) {
-			host.logger.debug("Sending 404 response");
+			host.logger.debug("Sending 404 response", req.url);
 			res.sendStatus(404);
 		});
 		host.logger.debug("Router configured", router.stack);
@@ -413,11 +431,13 @@ module.exports = function(messageRouter) {
 	};
 	
 	//var crypto = require("crypto");
-	app.use(function(err, req, res, next) {
-		//var sha1 = crypto.createHash("sha1");
-		//sha1.update(err.stack);
-		logger.error(err);
-		error(req, res);
+	app.use(function(err, req, res) {
+        try {
+            process.domain.logger.error(err);
+        } catch(e) {
+            logger.error(err);
+        }
+        error(req, res);
 	});
 	
 	messageRouter.receive("StartListening", function(data) {

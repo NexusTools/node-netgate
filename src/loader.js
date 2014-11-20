@@ -12,7 +12,7 @@ var messageRouter = new messageRouter(function(callback) {
 	process.on("message", callback);
 }, function(message) {
 	process.send(message);
-});
+}, logger);
 
 process.on('uncaughtException', function(err) {
 	logger.fatal("Unhandled exception:", err);

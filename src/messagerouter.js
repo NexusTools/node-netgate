@@ -1,4 +1,7 @@
 function MessageRouter(receive, send, logger) {
+    if(!logger)
+        throw new Error();
+    
 	this.__send = send;
 	this.__handlers = {};
 	this.__requests = {};
