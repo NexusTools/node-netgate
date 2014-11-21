@@ -29,4 +29,27 @@ page h2 {
 	<li><a target="_blank" href="//reddit.com/r/todayilearned">Learn something new on reddit.</a></li>
 	<li><a target="_blank" href="//imgur.com">Browse imgur.</a></li>
 </ul>
-</page></body></html>
+</page><script>
+function checkServer() {
+    console.log("Checking status");
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.onreadystatechange=function check_return(){
+        if (xmlhttp.readyState==4)  {
+            if(xmlhttp.status != 503) {
+                console.log("Online! ", xmlhttp.status);
+                window.location.reload();
+            } else
+                checkAgain();
+                
+        }
+    }
+    xmlhttp.open("GET","/",true);
+    xmlhttp.send();
+}
+function checkAgain() {
+    var seconds = Math.round(5 + 15*Math.random());
+    console.log("Checking again in", seconds, "seconds");
+    setTimeout(checkServer, seconds * 1000);
+}
+checkAgain();
+</script></body></html>

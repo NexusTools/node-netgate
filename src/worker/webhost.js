@@ -361,7 +361,7 @@ module.exports = function(messageRouter) {
 			host.logger.debug("Not configured yet...");
 			
 			var stack, deleteStartup = true, deleteFailure = true;
-			stack = [function failure(req, res, next) {
+			stack = [function failure_display(req, res, next) {
 				if(host.errored)
 					failure(req, res);
 				else {
@@ -371,7 +371,7 @@ module.exports = function(messageRouter) {
 					}
 					next();
 				}
-			}, partsRouter, function startup(req, res, next) {
+			}, partsRouter, function startup_display(req, res, next) {
 				if(host.configured) {
 					if(deleteStartup) {
 						deleteStartup = false;
