@@ -32,6 +32,10 @@ module.exports = function(messageRouter) {
 	var app = express();
 	if(process.env.HTTP_TRUST_PROXY)
 		app.enable("trust proxy");
+    
+    function netgate_service(name, callback /*(err, service)*/) {
+        throw new Error("Service API not implemented yet...");
+    }
 
 	function argWrap0(func, constants, callback) {
 		var names = argnames(func);
@@ -155,12 +159,7 @@ module.exports = function(messageRouter) {
 
 							var handlerconstants = handler.constants = {};
 							_.extend(handlerconstants, hostconstants);
-							handlerconstants.comm = function(message, callback, persist) {
-								messageRouter.request("Comm", {
-									name: handler.name,
-									data: message
-								}, callback, persist);
-							};
+							handlerconstants.service = netgate_service;
 							handlerconstants.config = config;
 
 							handler.stages = {};
@@ -305,45 +304,40 @@ module.exports = function(messageRouter) {
 
 				host.logger.gears("installed", type, config.path);
 			}
-			next = function(part) {
-				host.domain.run(function() {
-					if(part) {
-						if(part instanceof Error)
-							throw part;
+            next = host.domain.intercept(function(part) {
+                if(part) {
+                    host.logger.debug("Installing", lastPart[3], part.name);
+                    install(lastPart[2].config, part);
+                    delete lastPart;
+                    delete part;
+                }
 
-						host.logger.debug("Installing", lastPart[3], part.name);
-						install(lastPart[2].config, part);
-						delete lastPart;
-						delete part;
-					}
+                if(host.parts.length > 0) {
+                    var args = {}, ret;
+                    var nextPart = host.parts.shift();
+                    host.logger.debug("Configuring", nextPart[3], JSON.stringify(nextPart[1]));
+                    var callNext = nextPart[1].indexOf("next") == -1;
+                    _.extend(args, nextPart[2]);
+                    if(!callNext) {
+                        args.next = next;
+                        ret = nextPart[0](args);
+                        lastPart = nextPart;
+                    } else
+                        ret = nextPart[0](args);
+                    if(_.isFunction(ret)) {
+                        host.logger.debug("Installing", nextPart[3], ret.name);
+                        install(nextPart[2].config, ret);
+                    }
 
-					if(host.parts.length > 0) {
-						var args = {}, ret;
-						var nextPart = host.parts.shift();
-						host.logger.debug("Configuring", nextPart[3], JSON.stringify(nextPart[1]));
-						var callNext = nextPart[1].indexOf("next") == -1;
-						_.extend(args, nextPart[2]);
-						if(!callNext) {
-							args.next = next;
-							ret = nextPart[0](args);
-							lastPart = nextPart;
-						} else
-							ret = nextPart[0](args);
-						if(_.isFunction(ret)) {
-							host.logger.debug("Installing", nextPart[3], ret.name);
-							install(nextPart[2].config, ret);
-						}
-
-						if(callNext)
-							next();
-						else
-							host.logger.debug("Waiting on async part", nextPart[3]);
-					} else {
-						host.logger.debug("All parts configured");
-						host.configure();
-					}
-				});
-			}
+                    if(callNext)
+                        next();
+                    else
+                        host.logger.debug("Waiting on async part", nextPart[3]);
+                } else {
+                    host.logger.debug("All parts configured");
+                    host.configure();
+                }
+            });
 			try {
 				next();
 			} catch(e) {
@@ -384,7 +378,10 @@ module.exports = function(messageRouter) {
 			router.use(function slow_handler(req, res, next) {
 				if(stack.length > 1) {
 					var parts = stack.slice(0), _next;
-					_next = function() {
+					_next = function(err) {
+                        if(err)
+                            return next(err);
+                        
 						var part = parts.shift();
 						process.domain.logger.info("Part", part.name, parts.length);
 						part(req, res, parts.length > 0 ? _next : next);
@@ -431,7 +428,7 @@ module.exports = function(messageRouter) {
 	};
 	
 	//var crypto = require("crypto");
-	app.use(function(err, req, res) {
+	app.use(function(err, req, res, next) {
         try {
             process.domain.logger.error(err);
         } catch(e) {

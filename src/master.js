@@ -161,7 +161,9 @@ module.exports = function(config, readyCallback) {
 						throw new Error("Missing handler " + JSON.stringify(entry));
 				}
 
-				entry.handler = handlersLookup.resolve(entry.handler + ".js");
+                try {
+				    entry.handler = handlersLookup.resolve(entry.handler + ".js");
+                } catch(e) {/*Assume require("handler") will work, which is true for stuff like compression()*/}
 				handlers.push(entry);
 			});
 
@@ -185,7 +187,7 @@ module.exports = function(config, readyCallback) {
 
 		var workerCount = 0;
 		var listening = false, readyForConnections = false;
-		var workersLeft = Math.max(1, require('os').cpus().length);
+		var workersLeft = Math.max(1, process.env.WORKER_COUNT || require('os').cpus().length);
 		var spawnWorker = function() {
 			if(workersLeft < 1)
 				return; // No workers left to spawn
