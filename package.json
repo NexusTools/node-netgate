@@ -2,17 +2,18 @@
 	"name": "netgate",
 	"author": "NexusTools",
 	"homepage": "https://www.nexustools.net/projects#node-netgate",
-	"version": "0.3.1",
+	"version": "0.3.2",
 	"licenses": [
 		{
 			"type": "Apache License 2.0",
 			"url": "http://www.apache.org/licenses/LICENSE-2.0.html"
 		}
 	],
-	"description": "Easily setup a http route using express and vhost. Includes patches for specific hosts like OpenShift.",
+	"description": "Easily setup a cluster based http server using express and vhost. Includes patches for specific hosts like OpenShift.",
 	"keywords": [
         "hosts",
         "virtual",
+        "cluster",
         "website",
         "hosting",
         "modular",
@@ -39,6 +40,7 @@
 		"node" : ">=1.0.0"
 	},
 	"dependencies": {
+		"argwrap": "latest",
 		"express": "latest",
         "nulllogger": ">=0.2.3",
         "node-paths": ">=0.1.7",

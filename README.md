@@ -2,7 +2,7 @@
 
 node-netgate
 ------------
-Easily setup a http route using express and vhost.
+Easily setup a cluster based http server using express and vhost.
 Includes patches for specific hosts like OpenShift.
 
 ```

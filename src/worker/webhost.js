@@ -1,6 +1,7 @@
 var $break = new Object();
 var regexpWrap = /^\/(.+)\/$/;
 module.exports = function(messageRouter) {
+	var argwrap = require("argwrap");
 	var logger = require("nulllogger");
 	var express = require("express");
 	var domain =  require('domain');
@@ -12,7 +13,6 @@ module.exports = function(messageRouter) {
 	var upDir = path.dirname(__dirname);
 	var topDir = path.dirname(upDir);
 	var patchDir = path.resolve(topDir, "patches");
-	var argnames = require(path.resolve(upDir, "argnames.js"));
 	var internal = require(path.resolve(topDir, "internal", "handler.js"));
 	var startup = internal({path: "startup",code:503});
 	var failure = internal({"path":"failure"});
@@ -36,71 +36,6 @@ module.exports = function(messageRouter) {
     function netgate_service(name, callback /*(err, service)*/) {
         throw new Error("Service API not implemented yet...");
     }
-
-	function argWrap0(func, constants, callback) {
-		var names = argnames(func);
-		var revNames = names.slice(0).reverse();
-		
-		var source = "(function(input){";
-
-		var _else = false;
-		var until = revNames.length;
-		try {
-			if(until > 0) {
-				revNames.forEach(function(name) {
-					var isConstant = name in constants;
-					
-					if(!isConstant) {
-						if(_else)
-							source += "}else ";
-						else
-							_else = true;
-
-						source += "if(";
-						var _and = false;
-						for(var i=0;i<until;i++) {
-							if(_and)
-								source += " && ";
-							else
-								_and = true;
-							source += JSON.stringify(names[i]) + " in input";
-						}
-						source += "){";
-					} else if(_else)
-						source += "}else{";
-					source += "return [";
-					_and = false;
-					for(var i=0;i<until;i++) {
-						if(_and)
-							source += ",";
-						else
-							_and = true;
-						source += "input[" + JSON.stringify(names[i]) + "]";
-					}
-					source += "];";
-					if(isConstant)
-						throw $break;
-					until--;
-				});
-				source += "}else{";
-			}
-			source += "return [];";
-		} catch(e) {
-			if(e !== $break)
-				throw e;
-		}
-		if(_else)
-			source += "}";
-		source += "})";
-
-		var mapper = eval(source);
-		return [function(arguments) {
-			return func.apply(func, mapper(arguments));
-		}, names];
-	}
-	function argWrap(func, constants, callback) {
-		return argWrap0(func, constants, callback)[0];
-	}
 	
 	var constants = {
 		"type": "webhost",
@@ -195,7 +130,7 @@ module.exports = function(messageRouter) {
 								// Install this handler
 								var ret;
 								try {
-									ret = argWrap(impl.install, args)(args);
+									ret = argwrap(impl.install, Object.keys(args))(args);
 									installed[handler.name] = true;
 								} catch(e) {
 									if(e !== $perhost)
@@ -225,7 +160,7 @@ module.exports = function(messageRouter) {
 							var stage = stages[i];
 							host.handlers.forEach(function(handler) {
 								if(stage in handler.stages) {
-									var part = argWrap0(handler.stages[stage], handler.constants);
+									var part = argwrap.wrap0(handler.stages[stage], Object.keys(handler.constants));
 									part.push(handler.constants);
 									part.push(handler.name);
 									host.parts.push(part);
