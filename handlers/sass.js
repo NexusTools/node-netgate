@@ -4,8 +4,8 @@ try {
 
     module.exports = function(config) {
         return sassMiddleware({
-            src: path.resolve("src/sources")
-          , dest: path.resolve("src/static")
+            src: path.resolve(config.sources || "src/sources")
+          , dest: path.resolve(config.static || "src/static")
           , outputStyle: 'compressed'
         });
     }
