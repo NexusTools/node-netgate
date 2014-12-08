@@ -1,7 +1,7 @@
 var logger = require("nulllogger");
 var paths = require("node-paths");
 var cluster = require("cluster");
-var _ = require("underscore");
+var _ = require("lodash");
 var path = require("path");
 var fs = require("fs");
 

@@ -5,7 +5,7 @@ module.exports = function(messageRouter) {
 	var logger = require("nulllogger");
 	var express = require("express");
 	var domain =  require('domain');
-	var _ = require("underscore");
+	var _ = require("lodash");
 	var vhost = require("vhost");
 	var path = require("path");
 	var fs = require("fs");
@@ -18,18 +18,16 @@ module.exports = function(messageRouter) {
 	var failure = internal({"path":"failure"});
 	var error = internal({"path":"error"});
 
-	var applied = 0;
-	logger.debug("Running patches...");
+	logger.debug("Applying patches...");
 	fs.readdirSync(patchDir).forEach(function(patch) {
 		try {
 			require(path.resolve(patchDir, patch));
 			logger.info("Applied patch", patch);
-			applied ++;
 		} catch(e) {}
 	});
 
-	logger.debug("Configuring...");
 	var app = express();
+	logger.debug("Configuring...");
 	if(process.env.HTTP_TRUST_PROXY)
 		app.enable("trust proxy");
     
@@ -198,6 +196,9 @@ module.exports = function(messageRouter) {
 			var lastPart = null, next;
 			var router = express.Router(), partsRouter = express.Router();
 			router.use(function netgate_initializer(req, res, next) {
+                if(!req.hostname) // Assume its a status check like haproxy
+                    return res.end("Online");
+                
 				var _d = domain.create();
 				_d.add(req);
 				_d.add(res);
