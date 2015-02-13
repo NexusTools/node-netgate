@@ -41,8 +41,8 @@ module.exports = function(messageRouter) {
 	};
 	
 	var hostsToConfigure = 0;
-	var installed = {}, handlers = [], hosts = [], fallback;
-	var stages = ["preroute", "route", "postroute", "ready"];
+	var handlers = [], hosts = [], fallback;
+	var stages = ["install", "preroute", "route", "postroute", "ready"];
 	var hostsLayout = JSON.parse(process.env.HOST_LAYOUT_JSON);
 	for(var key in hostsLayout) {
 		(function(hostKey) {
@@ -79,69 +79,45 @@ module.exports = function(messageRouter) {
 				host.configure(err);
 			});
 			try {
-				_.extend(hostconstants, constants);
 				hostDomain.run(function() {
 					hostsLayout[hostKey].forEach(function(config) {
 						var handler = {
 							"name": path.basename(config.handler, ".js")
 						}
-						if(installed[handler.name] instanceof Error)
-							throw installed[handler.name];
-						try {
-							var impl = require(config.handler);
+                        var uniqueID = handler.id = hostKey + "/" + handler.name;
+                        
+                        var impl = require(config.handler);
+                        handler.constants = {
+                            named_service: netgate_service,
+                            service: function(callback) {
+                                netgate_service(uniqueID, callback);
+                            },
+                            config: config
+                        }
+                        _.extend(handler.constants, hostconstants);
 
-							var handlerconstants = handler.constants = {};
-							_.extend(handlerconstants, hostconstants);
-							handlerconstants.service = netgate_service;
-							handlerconstants.config = config;
+                        handler.stages = {};
+                        var foundStages = false;
+                        // Copy only what we need
+                        for(var i=0;i<stages.length;i++) {
+                            var stage = stages[i];
+                            if(stage in impl && _.isFunction(impl[stage])) {
+                                handler.stages[stage] = impl[stage];
+                                foundStages = true;
+                            }
+                        }
 
-							handler.stages = {};
-							var foundStages = false;
-							// Copy only what we need
-							for(var i=0;i<stages.length;i++) {
-								var stage = stages[i];
-								if(stage in impl) {
-									handler.stages[stage] = impl[stage];
-									foundStages = true;
-								}
-							}
+                        if(_.isFunction(impl)) {
+                            handler.stages["route"] = impl;
+                            foundStages = true;
+                        }
 
-							if(_.isFunction(impl)) {
-								handler.stages["route"] = impl;
-									foundStages = true;
-							}
-
-							if(!foundStages) {
-								_logger.warn(handler.name, "has no usable stages for this worker");
-								return;
-							}
-
-							if(impl.install && !(installed[handler.name])) {
-								var args = {};
-								_.extend(args, handlerconstants);
-								var $perhost = args["$perhost"] = new Object();
-								args.constants = {
-									"host": host.constants,
-									"global": constants
-								};
-
-								// Install this handler
-								var ret;
-								try {
-									ret = argwrap(impl.install, Object.keys(args))(args);
-									installed[handler.name] = true;
-								} catch(e) {
-									if(e !== $perhost)
-										throw e;
-
-								}
-							}
-							host.handlers.push(handler);
-						} catch(e) {
-							// Save the error incase something else depends on it
-							installed[handler.name] = e;
-							throw e;
-						}
+                        if(!foundStages) {
+                            _logger.warn(handler.name, "has no usable stages for this worker");
+                            return;
+                        }
+                        
+                        host.handlers.push(handler);
 					});
 
 					if(host.handlers.length > 0) {
@@ -154,7 +130,7 @@ module.exports = function(messageRouter) {
 							handler.constants = consts;
 						});
 
-						for(var i=0;i<stages.length;i++) {
+						for(var i=1;i<stages.length;i++) {
 							var stage = stages[i];
 							host.handlers.forEach(function(handler) {
 								if(stage in handler.stages) {
@@ -204,13 +180,7 @@ module.exports = function(messageRouter) {
 				_d.add(res);
 				
                 _d.logger = logger(host.logger._scopes[0], req.url);
-				_d.on("error", function(err) {
-                    _d.logger.error("Uncaught Error", err);
-				    //next(err || new Error("Uncaught Error"));
-                    try {
-                        error(req, res);
-                    } catch(e) {}
-				});
+				_d.on("error", next);
                 _d.run(function() {
                     if("user-agent" in req.headers)
                         _d.logger.info(req.method, req.hostname, req.url, "from", req.ip, req.headers['user-agent']);
@@ -228,7 +198,6 @@ module.exports = function(messageRouter) {
                     
                     next();
                 });
-				
 			});
 			var install = function(config, part) {
 				var type = config.type || "use";
@@ -253,6 +222,7 @@ module.exports = function(messageRouter) {
                     var nextPart = host.parts.shift();
                     host.logger.debug("Configuring", nextPart[3], JSON.stringify(nextPart[1]));
                     var callNext = nextPart[1].indexOf("next") == -1;
+                    _.extend(args, constants);
                     _.extend(args, nextPart[2]);
                     if(!callNext) {
                         args.next = next;
@@ -260,6 +230,7 @@ module.exports = function(messageRouter) {
                         lastPart = nextPart;
                     } else
                         ret = nextPart[0](args);
+                    
                     if(_.isFunction(ret)) {
                         host.logger.debug("Installing", nextPart[3], ret.name);
                         install(nextPart[2].config, ret);
@@ -274,6 +245,7 @@ module.exports = function(messageRouter) {
                     host.configure();
                 }
             });
+            
 			try {
 				next();
 			} catch(e) {
@@ -366,11 +338,19 @@ module.exports = function(messageRouter) {
 	//var crypto = require("crypto");
 	app.use(function(err, req, res, next) {
         try {
-            process.domain.logger.error(err);
+            process.domain.logger.error("Error occured", err);
         } catch(e) {
-            logger.error(err);
+            logger.error("Error occured", err);
         }
-        error(req, res);
+        try {
+            req.error = err;
+            (req.copy||(req.copy=[])).push("error");
+            res.sendStatus(500);
+        } catch(e) {
+            try {
+                res.end();
+            } catch(e) {}
+        }
 	});
 	
 	messageRouter.receive("StartListening", function(data) {
