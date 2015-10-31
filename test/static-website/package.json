@@ -4,7 +4,7 @@
 	"version": "0.0.1",
 	"wwwroot": "www",
 	"engine": {
-		"netgate": ">= 0.0.1"
+		"nexusfork": ">= 0.3.8"
 	},
 	"private": "true"
 }

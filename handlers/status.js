@@ -1,7 +1,7 @@
 module.exports = {
 	postroute: function(config) {
 		var code = config.code || 404;
-		return function netgate_status_response(req, res) {
+		return function nexusfork_status_response(req, res) {
 			res.sendStatus(code);
 		};
 	}

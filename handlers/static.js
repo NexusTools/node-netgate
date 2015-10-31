@@ -11,7 +11,7 @@ module.exports = function(config, logger) {
 		
         var fs = require("fs");
         var path = require("path");
-        router.use(function netgate_index_redirect(req, res, next) {
+        router.use(function nexusfork_index_redirect(req, res, next) {
             var subpath = req.path;
             var pos = subpath.indexOf("?");
             if(pos != -1)

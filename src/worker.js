@@ -194,7 +194,7 @@ module.exports = function(opts) {
 
 			var lastPart = null, next;
 			var router = express.Router();
-			router.use(function netgate_logger(req, res, next) {
+			router.use(function nexusfork_logger(req, res, next) {
 				if("user-agent" in req.headers)
 					host.logger.info(req.method, req.hostname, req.url, "from", req.ip, req.headers['user-agent']);
 				else

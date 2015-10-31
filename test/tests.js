@@ -14,13 +14,13 @@ it('parse package.json', function(){
     if(!("main" in pkg))
         throw new Error("`package.json` missing property `main`");
 });
-var netgate;
+var nexusfork;
 it("require main", function(){
-    netgate = require(topDir);
+    nexusfork = require(topDir);
 });
 describe("api", function() {
     it("static website", function(done){
-        netgate(path.resolve(__dirname, "static-website"), done);
+        nexusfork(path.resolve(__dirname, "static-website"), done);
     });
     it("test static website", function(done){
         http.get("http://127.0.0.1:8080/", function(res) {

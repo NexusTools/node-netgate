@@ -7,7 +7,7 @@ module.exports = function(config, logger) {
 	var to = config.to;
 	var code = config.code || 302;
 	if(config.stripURL)
-		return function netgate_redirect(req, res) {
+		return function nexusfork_redirect(req, res) {
 			logger.info("Redirecting to", to, code);
 			res.redirect(code, to);
 		};
@@ -15,7 +15,7 @@ module.exports = function(config, logger) {
 		if(endSlash.test(to))
 			to = to.substring(0, to.length-1);
 		
-		return function netgate_redirect(req, res) {
+		return function nexusfork_redirect(req, res) {
 			var concat = to + req.url;
 			logger.info("Redirecting to", concat, code);
 			res.redirect(code, concat);

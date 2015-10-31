@@ -182,7 +182,7 @@ module.exports = function(config, readyCallback) {
 		masterLogger.info("Spawning workers");
 		cluster.setupMaster({
 			exec : path.resolve(__dirname, "loader.js"),
-			silent : process.env.NETGATE_SILENCE_WORKERS
+			silent : process.env.NETGATE_SILENCE_WORKERS||process.env.NEXUSFORK_SILENCE_WORKERS
 		});
 
 		var workerCount = 0;

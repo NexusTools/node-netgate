@@ -31,7 +31,7 @@ module.exports = function(messageRouter) {
 	if(process.env.HTTP_TRUST_PROXY)
 		app.enable("trust proxy");
     
-    function netgate_service(name, callback /*(err, service)*/) {
+    function nexusfork_service(name, callback /*(err, service)*/) {
         throw new Error("Service API not implemented yet...");
     }
 	
@@ -88,9 +88,9 @@ module.exports = function(messageRouter) {
                         
                         var impl = require(config.handler);
                         handler.constants = {
-                            named_service: netgate_service,
+                            named_service: nexusfork_service,
                             service: function(callback) {
-                                netgate_service(uniqueID, callback);
+                                nexusfork_service(uniqueID, callback);
                             },
                             config: config
                         }
@@ -171,7 +171,7 @@ module.exports = function(messageRouter) {
 
 			var lastPart = null, next;
 			var router = express.Router(), partsRouter = express.Router();
-			router.use(function netgate_initializer(req, res, next) {
+			router.use(function nexusfork_initializer(req, res, next) {
                 if(!req.hostname) // Assume its a status check like haproxy
                     return res.end("Online");
                 
@@ -299,7 +299,7 @@ module.exports = function(messageRouter) {
 					stack[0](req, res, next);
 			});
 		}
-		router.use(function netgate_notfound(req, res) {
+		router.use(function nexusfork_notfound(req, res) {
 			host.logger.debug("Sending 404 response", req.url);
 			res.sendStatus(404);
 		});

@@ -1,8 +1,8 @@
 {
-	"name": "netgate",
+	"name": "nexusfork",
 	"author": "NexusTools",
-	"homepage": "https://www.nexustools.net/projects#node-netgate",
-	"version": "0.3.7",
+	"homepage": "https://nexustools.com/",
+	"version": "0.3.8",
 	"licenses": [
 		{
 			"type": "Apache License 2.0",
@@ -23,11 +23,11 @@
         "vhost"
 	],
 	"bugs": {
-		"url" : "https://github.com/NexusTools/node-netgate/issues"
+		"url" : "https://github.com/NexusTools/node-nexusfork/issues"
 	},
 	"repository": {
 		"type" : "git",
-		"url" : "https://github.com/NexusTools/node-netgate.git"  
+		"url" : "https://github.com/NexusTools/node-nexusfork.git"  
 	},
 	"preferGlobal" : true,
 	"main" : "src/master.js",
