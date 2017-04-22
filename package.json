@@ -2,13 +2,8 @@
     "name": "nexusfork",
     "author": "NexusTools",
     "homepage": "https://nexustools.com/",
-    "version": "0.3.8",
-    "licenses": [
-        {
-            "type": "Apache License 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-        }
-    ],
+    "version": "0.4.1",
+    "license": "Apache-2.0",
     "description": "Easily setup a cluster based http server using express and vhost. Includes patches for specific hosts like OpenShift.",
     "keywords": [
         "hosts",
@@ -42,16 +37,16 @@
     },
     "dependencies": {
         "argwrap": "^0.0.2",
-        "express": "^4.13.4",
-        "nulllogger": "^0.2.4",
+        "express": "^4.15.2",
+        "nulllogger": "^0.3.0",
         "node-paths": "^0.2.0",
         "compression": "^1.6.2",
-        "chokidar": "^1.5.1",
-        "lodash": "^4.13.1",
+        "chokidar": "^1.6.1",
+        "lodash": "^4.17.4",
         "vhost": "^3.0.2"
     },
     "devDependencies": {
-        "istanbul": "^0.4.3",
-        "mocha": "^2.5.3"
+        "istanbul": "^0.4.5",
+        "mocha": "^3.2.0"
     }
 }
