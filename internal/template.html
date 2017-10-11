@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>{{title}}</title>
+        <meta name="robots" content="noindex, nofollow" />
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css" />
+        <style>
+            body {
+                background: #999;
+            }
+            .page {
+                width: auto;
+                margin: 24px auto;
+                background: white;
+                border-radius: 8px;
+                box-shadow: black 1px 1px 6px;
+                padding: 12px 24px;
+                display: table;
+            }
+            .page h1 {
+                text-align: center;
+                margin-bottom: 30px;
+                font-size: 240%;
+            }
+            .page h2 {
+                font-size: 120%;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="page">
+            <h1>{{title}}</h1>
+            <p>{{message}}</p>
+            {{extras}}
+        </div>
+        {{footer}}
+    </body>
+</html>

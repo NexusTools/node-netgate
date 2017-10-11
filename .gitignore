@@ -2,6 +2,7 @@
 /compiled
 /coverage
 
+package-lock.json
 npm-debug.log
 *.bak
 *~

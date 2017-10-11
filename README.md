@@ -3,7 +3,6 @@
 node-nexusfork
 --------------
 Easily setup a cluster based http server using express and vhost.
-Includes patches for specific hosts like OpenShift.
 
 ```
 npm install -g nexusfork

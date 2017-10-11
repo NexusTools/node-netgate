@@ -5,4 +5,5 @@
 *~
 *.bak
 .travis.yml
+package-lock.json
 .gitignore

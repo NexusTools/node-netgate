@@ -1,10 +1,10 @@
 {
-	"name": "static-website",
-	"description": "A test static website.",
-	"version": "0.0.1",
-	"wwwroot": "www",
-	"engine": {
-		"nexusfork": ">= 0.3.8"
-	},
-	"private": "true"
+    "name": "static-website",
+    "description": "A test static website.",
+    "version": "0.0.1",
+    "wwwroot": "www",
+    "engine": {
+        "nexusfork": ">= 0.5.0"
+    },
+    "private": "true"
 }
