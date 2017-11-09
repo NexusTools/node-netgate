@@ -22,12 +22,7 @@ var reqparams = ["req", "request", "r1"];
 var resparams = ["res", "response", "r2"];
 var catchallPattern = /.+/;
 function makeRegexFromDomain(path) {
-    path = path.replace(/\$/g, "\\$").replace(/\^/g, "\\^");
-    if (path[0] != "^")
-        path = "^" + path;
-    if (!/\$$/.test(path))
-        path += "$";
-    return new RegExp(path, 'i');
+    return new RegExp("^" + path.replace(/\$/g, "\\$").replace(/\^/g, "\\^") + "$", 'i');
 }
 function valueOrNegativeOne(val, cmp) {
     return val === cmp || val === -1;

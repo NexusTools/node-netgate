@@ -15,14 +15,7 @@ const resparams = ["res", "response", "r2"];
 const catchallPattern = /.+/;
 
 function makeRegexFromDomain(path: string) {
-    path = path.replace(/\$/g, "\\$").replace(/\^/g, "\\^");
-    
-    if(path[0] != "^")
-        path = "^" + path;
-    if(!/\$$/.test(path))
-        path += "$";
-    
-    return new RegExp(path, 'i');
+    return new RegExp("^" + path.replace(/\$/g, "\\$").replace(/\^/g, "\\^") + "$", 'i');
 }
 
 export interface Config {
