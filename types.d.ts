@@ -23,7 +23,8 @@ declare module nexusfork {
         readonly hostnamematches?: RegExpMatchArray;
     }
     export interface WebResponse extends express.Response {
-        sendFailure(): void;
+        sendStatus(code: number): WebResponse;
+        sendFailure(err?: Error): WebResponse;
     }
     export interface WebRequestHandler {
         (req: WebRequest, res: WebResponse, next?: express.NextFunction): void;

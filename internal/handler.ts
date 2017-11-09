@@ -4,14 +4,20 @@ import _ = require("lodash");
 import fs = require("fs");
 
 const template = fs.readFileSync(path.resolve(__dirname, "template.html"), "utf8");
-const extras_meantime_head = "<h2>In the meantime you can:</h2><ul><li><a href=''>Reload the page <sup>(Might Work</sup></a></li>";
+const extras_meantime_head = "<h2>In the meantime you can:</h2><ul><li><a href='javascript:location.reload(true);void();'>Reload the page <sup id='timer'></sup></a></li>";
 const extras_foot = '<li><a target="_blank" href="//reddit.com/r/todayilearned">Learn something new on reddit.</a></li><li><a target="_blank" href="//imgur.com">Browse imgur.</a></li></ul>';
 const extras_meantime = extras_meantime_head + extras_foot;
 const meantime_footer = "<script>" + fs.readFileSync(path.resolve(__dirname, "meantime.js"), "utf8") + "</script>";
 const defaults: {[index:string]:{title:string,message:string,extras:string,footer:string}} = {
+    "403": {
+        title: "Permission denied",
+        message: "You do not have permission to access the content for the requested URL.",
+        extras: "",
+        footer: ""
+    },
     "404": {
         title: "No content",
-        message: "There is no content to display for the specified URL.",
+        message: "There is no content to display for the requested URL.",
         extras: "",
         footer: ""
     },
@@ -41,13 +47,20 @@ export = function (code: number, title?: string, message?: string, extras?: stri
     Object.keys(page).forEach(function(key) {
         data = data.replace(new RegExp("\\{\\{" + key + "\\}\\}", "g"), page[key]);
     });
-    var headers = {
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Length": data.length
-    };
 
-    return function nexusfork_internal(req, res) {
-        res.writeHead(code, headers);
-        res.end(data);
+    return function nexusfork_internal(req, res, more?: any) {
+        var thisdata;
+        if(more)
+            thisdata = data.replace(/{{more}}/g, more);
+        else
+            thisdata = data.replace(/{{more}}/g, "");
+        res.writeHead(code, {
+            "Content-Type": "text/html; charset=utf-8",
+            "Content-Length": thisdata.length
+        });
+        if(req.method == "HEAD")
+            res.end();
+        else
+            res.end(thisdata);
     } as nexusfork.WebRequestHandler;
 }

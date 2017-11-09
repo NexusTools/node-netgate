@@ -114,12 +114,14 @@ export class NexusFork extends ServiceGroup {
         for (var key in _config.hosts) {
             var host = _config.hosts[key];
 
-            if (!_.isArray(host)) {
-                if (_.isObject(host) || _.isString(host))
+            if (!Array.isArray(host)) {
+                if (_.isString(host))
                     host = [{
                         handler: "static",
                         root: host
                     }];
+                else if(_.isObjectLike(host))
+                    host = [host];
                 else
                     throw new Error("Host value must be a `String`, `Array` or `Object`");
             }

@@ -9,6 +9,8 @@ import _ = require("lodash");
 
 const stages = ["install", "preroute", "route", "postroute", "ready"];
 const cbparams = ["cb", "callback", "next", "done"];
+const reqparams = ["req", "request", "r1"];
+const resparams = ["res", "response", "r2"];
 
 const catchallPattern = /.+/;
 
@@ -45,11 +47,9 @@ function isAsyncHandler(params: string[]) {
 }
 
 function isRequestHandler(argnames: string[]) {
-    return argnames.length >= 1 && argnames.length <= 3 && (
-            argnames.indexOf("req") == 0 ||
-            argnames.indexOf("request") == 0)
-        && (valueOrNegativeOne(argnames.indexOf("res"), 1) ||
-        valueOrNegativeOne(argnames.indexOf("response"), 1))
+    return argnames.length >= 1 && argnames.length <= 3 && 
+            reqparams.indexOf(argnames[0]) != -1
+        && (argnames.length < 2 || resparams.indexOf(argnames[1]) != -1)
         && (argnames.length < 3 || cbparams.indexOf(argnames[2]) != -1);
 }
 
@@ -77,7 +77,8 @@ export default class WebService extends Service {
     }
     protected start0(cb: (err?: Error) => void): void{
         var catchall: nexusfork.WebRequestHandler;
-        const wildcards: {[0]: string, [1]: nexusfork.WebRequestHandler}[] = []; 
+        var catchallLogger: nulllogger.INullLogger;
+        const wildcards: {[0]: string, [1]: nexusfork.WebRequestHandler, [2]: nulllogger.INullLogger}[] = []; 
         const app = express();
         try {
             const constants = {
@@ -85,19 +86,67 @@ export default class WebService extends Service {
                 app
             };
             
-            var hosts: {pattern: RegExp, handler: Function}[] = [];
-            app.use(function(req, res, next) {
+            var hosts: {pattern: RegExp, handler: Function, logger: nulllogger.INullLogger}[] = [];
+            app.use((req: nexusfork.WebRequest, res: nexusfork.WebResponse) => {
+                try {
+                    Object.defineProperty(req, "services", {
+                        value: this._services
+                    });
+                } catch(e) {}
+                try {
+                    Object.defineProperty(res, "sendFailure", {
+                        configurable: true,
+                        value: function(err?: Error) {
+                            if(err)
+                                failureerr(req, res, err);
+                            else
+                                failure(req, res);
+                        }
+                    });
+                } catch(e) {}
+                try {
+                    Object.defineProperty(res, "sendStatus", {
+                        configurable: true,
+                        value: function(code: number) {
+                            switch(code) {
+                                case 403:
+                                    internal403(req, res);
+                                    break;
+                                case 404:
+                                    internal404(req, res);
+                                    break;
+                                case 503:
+                                    startup(req, res);
+                                    break;
+                                default:
+                                    failure(req, res);
+                                    break;
+                            }
+                        }
+                    });
+                } catch(e) {}
                 try {
                     hosts.forEach(function(host) {
                         var matches = req.hostname.match(host.pattern);
                         if(matches) {
+                            try {
+                                Object.defineProperty(req, "logger", {
+                                    configurable: true,
+                                    value: host.logger
+                                });
+                            } catch(e) {}
                             try {
                                 Object.defineProperty(req, "hostnamematches", {
                                     configurable: true,
                                     value: matches
                                 });
                             } catch(e) {}
-                            host.handler(req, res, next);
+                            host.handler(req, res, function(err?: Error) {
+                                if (err)
+                                    failureerr(req, res, err);
+                                else
+                                    res.sendStatus(404);
+                            });
                             throw true;
                         }
                     });
@@ -106,11 +155,16 @@ export default class WebService extends Service {
                         return;
                     throw e;
                 }
-                next();
+                res.sendStatus(404);
             });
             
+            const startup = internal(503);
             const failure = internal(500);
-            var startup: nexusfork.WebRequestHandler;
+            const internal404 = internal(404);
+            const internal403 = internal(403);
+            const failureerr = function (req: nexusfork.WebRequest, res: nexusfork.WebResponse, err: Error) {
+                (failure as Function)(req, res, "<code style=\"padding: 6px; background: red; color: white; border-radius: 6px; margin: 6px 0; display: block\">" + err + "</code>");
+            }
             Object.keys(this._config).forEach((host) => {
                 const logger = this._logger.extend("R:" + host);
                 logger.gears("Processing", host);
@@ -127,7 +181,6 @@ export default class WebService extends Service {
                     if(hasAsync)
                         return;
                     hasAsync = true;
-                    startup = internal(503);
                     stages.forEach(function(stage) {
                         const existing = stageImpls[stage];
                         (stageImpls[stage] = []).push = pushToAsync;
@@ -213,12 +266,6 @@ export default class WebService extends Service {
                         if(errored)
                             failure(req, res);
                         else if(ready) {
-                            Object.defineProperty(req, "services", {
-                                value: this._services
-                            });
-                            Object.defineProperty(req, "logger", {
-                                value: logger
-                            });
                             async.eachSeries(hoststack, function(impl, cb) {
                                 try {
                                     impl(req, res, cb);
@@ -281,17 +328,6 @@ export default class WebService extends Service {
                             return; // Don't setup
                         if(hoststack.length > 1)
                             handler = (req, res, next) => {
-                                try {
-                                    Object.defineProperty(req, "services", {
-                                        value: this._services
-                                    });
-                                } catch(e) {}
-                                try {
-                                    Object.defineProperty(req, "logger", {
-                                        configurable: true,
-                                        value: logger
-                                    });
-                                } catch(e) {}
                                 async.eachSeries(hoststack, function(impl, cb) {
                                     try {
                                         impl(req, res, cb);
@@ -305,34 +341,21 @@ export default class WebService extends Service {
                                         next();
                                 });
                             };
-                        else {
-                            const _handler = hoststack[0];
-                            handler = (req, res, next) => {
-                                try {
-                                    Object.defineProperty(req, "services", {
-                                        value: this._services
-                                    });
-                                } catch(e) {}
-                                try {
-                                    Object.defineProperty(req, "logger", {
-                                        configurable: true,
-                                        value: logger
-                                    });
-                                } catch(e) {}
-                                _handler(req, res, next);
-                            }
-                        }
+                        else
+                            handler = hoststack[0];
                     } catch(e) {
                         logger.error(e);
                         handler = failure;
                     }
                 }
-                if(host == "*")
+                if(host == "*") {
                     catchall = handler;
-                else if(host.indexOf("*") != -1)
-                    wildcards.push([host, handler]);
+                    catchallLogger = logger;
+                } else if(host.indexOf("*") != -1)
+                    wildcards.push([host, handler, logger]);
                 else
                     hosts.push({
+                        logger,
                         pattern: makeRegexFromDomain(host),
                         handler
                     });
@@ -340,22 +363,18 @@ export default class WebService extends Service {
             
             wildcards.forEach(function(wildcard) {
                 hosts.push({
+                    logger: wildcard[2],
                     pattern: makeRegexFromDomain(wildcard[0].replace(/\*/g, '([^.]+)')),
                     handler: wildcard[1]
                 });
             });
             
-            var no404handler;
-            if(catchall) {
+            if(catchall)
                 hosts.push({
+                    logger: catchallLogger,
                     pattern: catchallPattern,
                     handler: catchall
-                })
-                no404handler = argwrap.names(catchall).length < 3;
-            }
-
-            if(!no404handler && !process.env.NO_404_HANDLER)
-                app.use(internal(404));
+                });
         } catch(e) {
             this._logger.error(e);
             return cb(e);

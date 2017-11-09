@@ -18,6 +18,8 @@ var async = require("async");
 var _ = require("lodash");
 var stages = ["install", "preroute", "route", "postroute", "ready"];
 var cbparams = ["cb", "callback", "next", "done"];
+var reqparams = ["req", "request", "r1"];
+var resparams = ["res", "response", "r2"];
 var catchallPattern = /.+/;
 function makeRegexFromDomain(path) {
     path = path.replace(/\$/g, "\\$").replace(/\^/g, "\\^");
@@ -44,10 +46,9 @@ function isAsyncHandler(params) {
     }
 }
 function isRequestHandler(argnames) {
-    return argnames.length >= 1 && argnames.length <= 3 && (argnames.indexOf("req") == 0 ||
-        argnames.indexOf("request") == 0)
-        && (valueOrNegativeOne(argnames.indexOf("res"), 1) ||
-            valueOrNegativeOne(argnames.indexOf("response"), 1))
+    return argnames.length >= 1 && argnames.length <= 3 &&
+        reqparams.indexOf(argnames[0]) != -1
+        && (argnames.length < 2 || resparams.indexOf(argnames[1]) != -1)
         && (argnames.length < 3 || cbparams.indexOf(argnames[2]) != -1);
 }
 var pushToAsync = function () {
@@ -77,6 +78,7 @@ var WebService = /** @class */ (function (_super) {
     WebService.prototype.start0 = function (cb) {
         var _this = this;
         var catchall;
+        var catchallLogger;
         var wildcards = [];
         var app = express();
         try {
@@ -85,11 +87,58 @@ var WebService = /** @class */ (function (_super) {
                 app: app
             };
             var hosts = [];
-            app.use(function (req, res, next) {
+            app.use(function (req, res) {
+                try {
+                    Object.defineProperty(req, "services", {
+                        value: _this._services
+                    });
+                }
+                catch (e) { }
+                try {
+                    Object.defineProperty(res, "sendFailure", {
+                        configurable: true,
+                        value: function (err) {
+                            if (err)
+                                failureerr_1(req, res, err);
+                            else
+                                failure_1(req, res);
+                        }
+                    });
+                }
+                catch (e) { }
+                try {
+                    Object.defineProperty(res, "sendStatus", {
+                        configurable: true,
+                        value: function (code) {
+                            switch (code) {
+                                case 403:
+                                    internal403_1(req, res);
+                                    break;
+                                case 404:
+                                    internal404_1(req, res);
+                                    break;
+                                case 503:
+                                    startup_1(req, res);
+                                    break;
+                                default:
+                                    failure_1(req, res);
+                                    break;
+                            }
+                        }
+                    });
+                }
+                catch (e) { }
                 try {
                     hosts.forEach(function (host) {
                         var matches = req.hostname.match(host.pattern);
                         if (matches) {
+                            try {
+                                Object.defineProperty(req, "logger", {
+                                    configurable: true,
+                                    value: host.logger
+                                });
+                            }
+                            catch (e) { }
                             try {
                                 Object.defineProperty(req, "hostnamematches", {
                                     configurable: true,
@@ -97,7 +146,12 @@ var WebService = /** @class */ (function (_super) {
                                 });
                             }
                             catch (e) { }
-                            host.handler(req, res, next);
+                            host.handler(req, res, function (err) {
+                                if (err)
+                                    failureerr_1(req, res, err);
+                                else
+                                    res.sendStatus(404);
+                            });
                             throw true;
                         }
                     });
@@ -107,10 +161,15 @@ var WebService = /** @class */ (function (_super) {
                         return;
                     throw e;
                 }
-                next();
+                res.sendStatus(404);
             });
+            var startup_1 = internal(503);
             var failure_1 = internal(500);
-            var startup;
+            var internal404_1 = internal(404);
+            var internal403_1 = internal(403);
+            var failureerr_1 = function (req, res, err) {
+                failure_1(req, res, "<code style=\"padding: 6px; background: red; color: white; border-radius: 6px; margin: 6px 0; display: block\">" + err + "</code>");
+            };
             Object.keys(this._config).forEach(function (host) {
                 var logger = _this._logger.extend("R:" + host);
                 logger.gears("Processing", host);
@@ -127,7 +186,6 @@ var WebService = /** @class */ (function (_super) {
                     if (hasAsync)
                         return;
                     hasAsync = true;
-                    startup = internal(503);
                     stages.forEach(function (stage) {
                         var existing = stageImpls[stage];
                         (stageImpls[stage] = []).push = pushToAsync;
@@ -219,12 +277,6 @@ var WebService = /** @class */ (function (_super) {
                         if (errored)
                             failure_1(req, res);
                         else if (ready) {
-                            Object.defineProperty(req, "services", {
-                                value: _this._services
-                            });
-                            Object.defineProperty(req, "logger", {
-                                value: logger
-                            });
                             async.eachSeries(hoststack, function (impl, cb) {
                                 try {
                                     impl(req, res, cb);
@@ -242,7 +294,7 @@ var WebService = /** @class */ (function (_super) {
                             });
                         }
                         else
-                            startup(req, res);
+                            startup_1(req, res);
                     };
                     async.eachSeries(stages, function (stage, cb) {
                         async.eachSeries(stageImpls[stage], function (impl, rcb) {
@@ -293,19 +345,6 @@ var WebService = /** @class */ (function (_super) {
                             return; // Don't setup
                         if (hoststack.length > 1)
                             handler = function (req, res, next) {
-                                try {
-                                    Object.defineProperty(req, "services", {
-                                        value: _this._services
-                                    });
-                                }
-                                catch (e) { }
-                                try {
-                                    Object.defineProperty(req, "logger", {
-                                        configurable: true,
-                                        value: logger
-                                    });
-                                }
-                                catch (e) { }
                                 async.eachSeries(hoststack, function (impl, cb) {
                                     try {
                                         impl(req, res, cb);
@@ -320,57 +359,40 @@ var WebService = /** @class */ (function (_super) {
                                         next();
                                 });
                             };
-                        else {
-                            var _handler_5 = hoststack[0];
-                            handler = function (req, res, next) {
-                                try {
-                                    Object.defineProperty(req, "services", {
-                                        value: _this._services
-                                    });
-                                }
-                                catch (e) { }
-                                try {
-                                    Object.defineProperty(req, "logger", {
-                                        configurable: true,
-                                        value: logger
-                                    });
-                                }
-                                catch (e) { }
-                                _handler_5(req, res, next);
-                            };
-                        }
+                        else
+                            handler = hoststack[0];
                     }
                     catch (e) {
                         logger.error(e);
                         handler = failure_1;
                     }
                 }
-                if (host == "*")
+                if (host == "*") {
                     catchall = handler;
+                    catchallLogger = logger;
+                }
                 else if (host.indexOf("*") != -1)
-                    wildcards.push([host, handler]);
+                    wildcards.push([host, handler, logger]);
                 else
                     hosts.push({
+                        logger: logger,
                         pattern: makeRegexFromDomain(host),
                         handler: handler
                     });
             });
             wildcards.forEach(function (wildcard) {
                 hosts.push({
+                    logger: wildcard[2],
                     pattern: makeRegexFromDomain(wildcard[0].replace(/\*/g, '([^.]+)')),
                     handler: wildcard[1]
                 });
             });
-            var no404handler;
-            if (catchall) {
+            if (catchall)
                 hosts.push({
+                    logger: catchallLogger,
                     pattern: catchallPattern,
                     handler: catchall
                 });
-                no404handler = argwrap.names(catchall).length < 3;
-            }
-            if (!no404handler && !process.env.NO_404_HANDLER)
-                app.use(internal(404));
         }
         catch (e) {
             this._logger.error(e);
