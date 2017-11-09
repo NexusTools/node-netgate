@@ -134,13 +134,13 @@ var NexusFork = /** @class */ (function (_super) {
         for (var key in _config.hosts) {
             var host = _config.hosts[key];
             if (!Array.isArray(host)) {
-                if (_.isObjectLike(host))
-                    host = [host];
-                else if (_.isString(host))
+                if (_.isString(host))
                     host = [{
-                        handler: "static",
-                        root: ""+host
-                    }];
+                            handler: "static",
+                            root: host
+                        }];
+                else if (_.isObjectLike(host))
+                    host = [host];
                 else
                     throw new Error("Host value must be a `String`, `Array` or `Object`");
             }
@@ -154,16 +154,16 @@ var NexusFork = /** @class */ (function (_super) {
                 if (_.isString(entry))
                     entry = {
                         handler: "static",
-                        root: path.resolve(rootPath, entry)
+                        root: entry
                     };
                 else if (!entry.handler) {
                     if (entry.root)
                         entry.handler = "static";
                     else
                         throw new Error("Missing handler " + JSON.stringify(entry));
-                    if (entry.root)
-                        entry.root = path.resolve(rootPath, entry.root);
                 }
+                if (entry.root)
+                    entry.root = path.resolve(rootPath, entry.root);
                 try {
                     entry.handler = _this.searchPaths.resolve("handlers/" + entry.handler + ".js");
                 }

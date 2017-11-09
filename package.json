@@ -31,7 +31,7 @@
     },
     "main": "main.js",
     "scripts": {
-        "test": "mocha --bail --reporter spec --check-leaks test/",
+        "test": "mocha --bail --reporter spec --check-leaks test/ --timeout 5000",
         "test-coverage": "istanbul cover node_modules/mocha/bin/_mocha -- --bail --reporter spec --check-leaks test/",
         "test-travis": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --reporter spec --check-leaks test/"
     },
