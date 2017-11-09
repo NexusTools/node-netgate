@@ -12,6 +12,7 @@ var __extends = (this && this.__extends) || (function () {
 exports.__esModule = true;
 var cluster = require("cluster");
 var events = require("events");
+var crypto = require("crypto");
 var async = require("async");
 var path = require("path");
 var _ = require("lodash");
@@ -23,7 +24,7 @@ var ServiceState;
     ServiceState[ServiceState["Started"] = 2] = "Started";
     ServiceState[ServiceState["Stopping"] = 3] = "Stopping";
 })(ServiceState = exports.ServiceState || (exports.ServiceState = {}));
-var Service = (function (_super) {
+var Service = /** @class */ (function (_super) {
     __extends(Service, _super);
     function Service(log, quiet) {
         if (quiet === void 0) { quiet = false; }
@@ -36,8 +37,30 @@ var Service = (function (_super) {
     Service.prototype.state = function () {
         return this._state;
     };
+    Service.prototype.openComm = function (cb) {
+        var _this = this;
+        switch (this._state) {
+            case ServiceState.Started:
+                this.openComm0(cb);
+                break;
+            case ServiceState.Starting:
+                this._cbstack.push(function (err) {
+                    if (err)
+                        cb(err);
+                    else
+                        _this.openComm(cb);
+                });
+                break;
+            default:
+                cb(new Error("Cannot stop service while in `" + ServiceState[this._state] + "` state"));
+        }
+    };
     Service.prototype.start = function (cb) {
         var _this = this;
+        if (!cb)
+            cb = function (err) {
+                _this.emit("error", err);
+            };
         switch (this._state) {
             case ServiceState.Stopped:
                 this._state = ServiceState.Starting;
@@ -76,6 +99,10 @@ var Service = (function (_super) {
     };
     Service.prototype.stop = function (cb) {
         var _this = this;
+        if (!cb)
+            cb = function (err) {
+                _this.emit("error", err);
+            };
         switch (this._state) {
             case ServiceState.Started:
                 this._state = ServiceState.Stopping;
@@ -114,7 +141,63 @@ var Service = (function (_super) {
     return Service;
 }(events.EventEmitter));
 exports.Service = Service;
-var ServiceGroup = (function (_super) {
+var SimpleCommService = /** @class */ (function (_super) {
+    __extends(SimpleCommService, _super);
+    function SimpleCommService() {
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this._events = {};
+        return _this;
+    }
+    SimpleCommService.prototype.openComm0 = function (cb) {
+        var self = this;
+        var myEvents = {};
+        cb(undefined, {
+            emit: function (event) {
+                var args = [];
+                for (var _i = 1; _i < arguments.length; _i++) {
+                    args[_i - 1] = arguments[_i];
+                }
+                args.unshift(event);
+                args.unshift(undefined);
+                self.handleCommEmit.apply(self, args);
+            },
+            emitWithErrorHandler: function (onerror, event) {
+                var args = [];
+                for (var _i = 2; _i < arguments.length; _i++) {
+                    args[_i - 2] = arguments[_i];
+                }
+                self.handleCommEmit.apply(self, arguments);
+            },
+            off: function (event, cb) {
+                if (cb) {
+                    var events = self._events[event];
+                    if (events) {
+                        if (events.indexOf(cb) == -1)
+                            events.push(cb);
+                    }
+                    else
+                        events = self._events[event] = [cb];
+                }
+                else
+                    delete self._events[event];
+            },
+            on: function (event, cb) {
+                var events = self._events[event];
+                if (!events)
+                    events = self._events[event] = [];
+                events.push(cb);
+            },
+            close: function () {
+            }
+        });
+    };
+    SimpleCommService.prototype.hasEvent = function (event) {
+        return true;
+    };
+    return SimpleCommService;
+}(Service));
+exports.SimpleCommService = SimpleCommService;
+var ServiceGroup = /** @class */ (function (_super) {
     __extends(ServiceGroup, _super);
     function ServiceGroup(log) {
         var _this = _super.call(this, log, true) || this;
@@ -129,6 +212,9 @@ var ServiceGroup = (function (_super) {
         var index = this._services.indexOf(service);
         if (index > -1)
             this._services.splice(index, 1);
+    };
+    ServiceGroup.prototype.openComm0 = function (cb) {
+        cb(new Error("ServiceGroup's do not support ServiceComm..."));
     };
     ServiceGroup.prototype.start0 = function (cb) {
         var started = [];
@@ -161,9 +247,9 @@ var ServiceGroup = (function (_super) {
     return ServiceGroup;
 }(Service));
 exports.ServiceGroup = ServiceGroup;
-var BuiltInService = (function (_super) {
+var BuiltInService = /** @class */ (function (_super) {
     __extends(BuiltInService, _super);
-    function BuiltInService(service, log, paths, config) {
+    function BuiltInService(service, commRegistry, log, paths, config) {
         var _this = _super.call(this, log, true) || this;
         _this._config = config;
         _this._service = paths.resolve("services/" + service + ".js");
@@ -174,16 +260,55 @@ var BuiltInService = (function (_super) {
     };
     BuiltInService.prototype.newService = function () {
         var _service = this.requireService();
-        return new _service(this._logger, this._config);
+        return new _service(this._logger, this._config, this._commRegistry);
     };
     return BuiltInService;
 }(Service));
 exports.BuiltInService = BuiltInService;
-var ClusterService = (function (_super) {
-    __extends(ClusterService, _super);
-    function ClusterService(service, log, paths, config) {
-        return _super.call(this, service, log, paths, config) || this;
+var ClusterServiceComm = /** @class */ (function () {
+    function ClusterServiceComm() {
     }
+    ClusterServiceComm.prototype.emit = function (event) {
+        var args = [];
+        for (var _i = 1; _i < arguments.length; _i++) {
+            args[_i - 1] = arguments[_i];
+        }
+    };
+    ClusterServiceComm.prototype.emitWithErrorHandler = function (onerror, event) {
+        var args = [];
+        for (var _i = 2; _i < arguments.length; _i++) {
+            args[_i - 2] = arguments[_i];
+        }
+    };
+    ClusterServiceComm.prototype.on = function (event, cb) {
+    };
+    ClusterServiceComm.prototype.off = function (event, cb) {
+    };
+    ClusterServiceComm.prototype.close = function () {
+    };
+    return ClusterServiceComm;
+}());
+var ClusterService = /** @class */ (function (_super) {
+    __extends(ClusterService, _super);
+    function ClusterService(service, commRegistry, log, paths, config) {
+        var _this = _super.call(this, service, commRegistry, log, paths, config) || this;
+        _this._pendingComms = {};
+        _this._comms = {};
+        return _this;
+    }
+    ClusterService.prototype.openComm0 = function (cb) {
+        var _this = this;
+        crypto.randomBytes(48, function (err, bytes) {
+            if (err)
+                return cb(err);
+            var uid = bytes.toString('hex');
+            _this._worker.send({
+                cmd: "openComm",
+                uid: uid
+            });
+            _this._pendingComms[uid] = cb;
+        });
+    };
     ClusterService.prototype.start0 = function (cb) {
         var _this = this;
         cluster.setupMaster({
@@ -234,6 +359,14 @@ var ClusterService = (function (_super) {
         worker.process.stderr.resume();
         worker.on("message", function (msg) {
             switch (msg.cmd) {
+                case "commOpened":
+                    _this._pendingComms[msg.uid](undefined, _this._comms[msg.uid] = new ClusterServiceComm());
+                    delete _this._pendingComms[msg.uid];
+                    break;
+                case "commErrored":
+                    _this._pendingComms[msg.uid](new Error(msg.message));
+                    delete _this._pendingComms[msg.uid];
+                    break;
                 case "started":
                     started = true;
                     cb();
@@ -284,6 +417,7 @@ var ClusterService = (function (_super) {
     };
     ClusterService.prototype.stop0 = function (_cb) {
         var _this = this;
+        this._comms = {};
         if (!this._worker)
             return _cb();
         this._worker.send({
@@ -331,13 +465,16 @@ var ClusterService = (function (_super) {
     return ClusterService;
 }(BuiltInService));
 exports.ClusterService = ClusterService;
-var LocalService = (function (_super) {
+var LocalService = /** @class */ (function (_super) {
     __extends(LocalService, _super);
-    function LocalService(service, log, paths, config) {
-        var _this = _super.call(this, service, log, paths, config) || this;
+    function LocalService(service, commRegistry, log, paths, config) {
+        var _this = _super.call(this, service, commRegistry, log, paths, config) || this;
         _this._impl = _this.newService();
         return _this;
     }
+    LocalService.prototype.openComm0 = function (cb) {
+        this._impl.openComm(cb);
+    };
     LocalService.prototype.start0 = function (cb) {
         this._impl.start(cb);
     };
@@ -349,20 +486,21 @@ var LocalService = (function (_super) {
 exports.LocalService = LocalService;
 var WorkerCount = process.env['WORKER_COUNT'];
 var CPUCount = Math.max(1, (WorkerCount && parseInt(WorkerCount)) || os.cpus().length);
-var DistributedServiceImpl = CPUCount > 1 ? ClusterService : LocalService;
-var DistributedService = (function (_super) {
+exports.DistributedServiceImpl = CPUCount > 1 ? ClusterService : LocalService;
+var DistributedService = /** @class */ (function (_super) {
     __extends(DistributedService, _super);
-    function DistributedService(service, log, paths, config) {
+    function DistributedService(service, commRegistry, log, paths, config) {
         var _this = _super.call(this, log.extend(service)) || this;
         if (CPUCount > 1)
             for (var i = 0; i < CPUCount; i++) {
-                _this.add(new DistributedServiceImpl(service, _this._logger.extend("" + (i + 1)), paths, config));
+                _this.add(new exports.DistributedServiceImpl(service, commRegistry, _this._logger.extend("" + (i + 1)), paths, config));
             }
         else
-            _this.add(new DistributedServiceImpl(service, _this._logger, paths, config));
+            _this.add(new exports.DistributedServiceImpl(service, commRegistry, _this._logger, paths, config));
         return _this;
     }
     return DistributedService;
 }(ServiceGroup));
 exports.DistributedService = DistributedService;
+// TODO: Add CloudService for linking nexusfork instances together across servers 
 //# sourceMappingURL=service.js.map

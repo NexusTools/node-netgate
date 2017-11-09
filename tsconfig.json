@@ -3,7 +3,6 @@
     "compilerOptions": {
         "declaration": true,
         "module": "commonjs",
-        "removeComments": true,
         "preserveConstEnums": true,
         "sourceMap": true
     },
@@ -13,6 +12,7 @@
     ],
     "include": [
         "src/*.ts",
+        "test/service-website/*/*.ts",
         "services/*.ts",
         "handlers/*.ts",
         "internal/*.ts"

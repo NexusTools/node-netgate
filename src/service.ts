@@ -1,6 +1,8 @@
 import paths = require("node-paths");
+import { nexusfork } from "../types";
 import cluster = require("cluster");
 import events = require("events");
+import crypto = require("crypto");
 import async = require("async");
 import path = require("path");
 import _ = require("lodash");
@@ -26,7 +28,28 @@ export abstract class Service extends events.EventEmitter implements Service {
     state() {
         return this._state;
     }
-    start(cb: (err?: Error) => void) {
+    openComm(cb: (err: Error, comm?: nexusfork.ServiceComm) => void) {
+        switch(this._state) {
+            case ServiceState.Started:
+                this.openComm0(cb);
+                break;
+            case ServiceState.Starting:
+                this._cbstack.push((err) => {
+                    if(err)
+                        cb(err);
+                    else
+                        this.openComm(cb);
+                });
+                break;
+            default:
+                cb(new Error("Cannot stop service while in `" + ServiceState[this._state] + "` state"));
+        }
+    }
+    start(cb?: (err?: Error) => void) {
+        if(!cb)
+            cb = (err) => {
+                this.emit("error", err);
+            }
         switch(this._state) {
             case ServiceState.Stopped:
                 this._state = ServiceState.Starting;
@@ -62,7 +85,11 @@ export abstract class Service extends events.EventEmitter implements Service {
                 cb(new Error("Cannot start service while in `" + ServiceState[this._state] + "` state"));
         }
     }
-    stop(cb: (err?: Error) => void) {
+    stop(cb?: (err?: Error) => void) {
+        if(!cb)
+            cb = (err) => {
+                this.emit("error", err);
+            }
         switch(this._state) {
             case ServiceState.Started:
                 this._state = ServiceState.Stopping;
@@ -97,8 +124,51 @@ export abstract class Service extends events.EventEmitter implements Service {
                 cb(new Error("Cannot stop service while in `" + ServiceState[this._state] + "` state"));
         }
     }
+    protected abstract openComm0(cb: (err: Error, comm?: nexusfork.ServiceComm) => void): void;
     protected abstract start0(cb: (err?: Error) => void): void;
     protected abstract stop0(cb: (err?: Error) => void): void;
+}
+
+export abstract class SimpleCommService extends Service {
+    protected _events: {[event: string]: Function[]} = {};
+    protected openComm0(cb: (err: Error, comm?: nexusfork.ServiceComm) => void): void{
+        const self = this;
+        const myEvents: {[event: string]: Function[]} = {};
+        cb(undefined, {
+            emit(event: string, ...args: any[]): void{
+                args.unshift(event);
+                args.unshift(undefined);
+                self.handleCommEmit.apply(self, args);
+            },
+            emitWithErrorHandler(onerror: (err: Error) => void, event: string, ...args: any[]): void{
+                self.handleCommEmit.apply(self, arguments);
+            },
+            off(event: string, cb?: (...args: any[]) => void): void{
+                if(cb) {
+                    var events = self._events[event];
+                    if(events) {
+                        if(events.indexOf(cb) == -1)
+                            events.push(cb);
+                    } else
+                        events = self._events[event] = [cb];
+                } else
+                    delete self._events[event];
+            },
+            on(event: string, cb: (...args: any[]) => void): void{
+                var events = self._events[event];
+                if(!events)
+                    events = self._events[event] = [];
+                events.push(cb);
+            },
+            close() {
+                
+            }
+        });
+    }
+    protected abstract handleCommEmit(onerror: (err: Error) => void, event: string, ...args: any[]): void;
+    protected hasEvent(event: string): boolean{
+        return true;
+    }
 }
 
 export class ServiceGroup extends Service {
@@ -114,6 +184,9 @@ export class ServiceGroup extends Service {
         const index = this._services.indexOf(service);
         if (index > -1)
             this._services.splice(index, 1);
+    }
+    protected openComm0(cb: (err: Error, comm?: nexusfork.ServiceComm) => void): void{
+        cb(new Error("ServiceGroup's do not support ServiceComm..."));
     }
     protected start0(cb: (err: Error) => void): void{
         var started: Service[] = [];
@@ -148,7 +221,8 @@ export class ServiceGroup extends Service {
 export abstract class BuiltInService extends Service {
     protected readonly _config: any;
     protected readonly _service: string;
-    constructor(service: string, log: nulllogger.INullLogger, paths: paths, config: any) {
+    protected readonly _commRegistry: nexusfork.ServiceCommRegistry;
+    constructor(service: string, commRegistry: nexusfork.ServiceCommRegistry, log: nulllogger.INullLogger, paths: paths, config: any) {
         super(log, true);
         this._config = config;
         this._service = paths.resolve("services/" + service + ".js");
@@ -158,15 +232,48 @@ export abstract class BuiltInService extends Service {
     }
     protected newService(): Service{
         const _service = this.requireService();
-        return new _service(this._logger, this._config);
+        return new _service(this._logger, this._config, this._commRegistry);
+    }
+}
+
+class ClusterServiceComm implements nexusfork.ServiceComm {
+    emit(event: string, ...args: any[]): void{
+        
+    }
+    emitWithErrorHandler(onerror: (err: Error) => void, event: string, ...args: any[]): void{
+        
+    }
+    on(event: string, cb: (...args: any[]) => void): void{
+        
+    }
+    off(event: string, cb: (...args: any[]) => void): void{
+        
+    }
+    close() {
+        
     }
 }
 
 export class ClusterService extends BuiltInService {
     private _worker: cluster.Worker;
+    private _pendingComms: {[index: string]: Function} = {};
+    private _comms: {[index: string]: nexusfork.ServiceComm} = {};
     static readonly WORKER = path.resolve(__dirname, "worker.js");
-    constructor(service: string, log: nulllogger.INullLogger, paths: paths, config: any) {
-        super(service, log, paths, config);
+    constructor(service: string, commRegistry: nexusfork.ServiceCommRegistry, log: nulllogger.INullLogger, paths: paths, config: any) {
+        super(service, commRegistry, log, paths, config);
+    }
+    protected openComm0(cb: (err: Error, comm?: nexusfork.ServiceComm) => void): void{
+        crypto.randomBytes(48, (err, bytes) => {
+            if(err)
+                return cb(err);
+            const uid = bytes.toString('hex');
+            this._worker.send({
+                cmd: "openComm",
+                uid
+            });
+            this._pendingComms[uid] = cb;
+        });
+            
     }
     protected start0(cb: (err?: Error) => void): void{
         cluster.setupMaster({
@@ -219,6 +326,14 @@ export class ClusterService extends BuiltInService {
         
         worker.on("message", (msg) => {
             switch(msg.cmd) {
+                case "commOpened":
+                    this._pendingComms[msg.uid](undefined, this._comms[msg.uid] = new ClusterServiceComm());
+                    delete this._pendingComms[msg.uid];
+                    break;
+                case "commErrored":
+                    this._pendingComms[msg.uid](new Error(msg.message));
+                    delete this._pendingComms[msg.uid];
+                    break;
                 case "started":
                     started = true;
                     cb();
@@ -271,6 +386,8 @@ export class ClusterService extends BuiltInService {
         });
     }
     protected stop0(_cb: (err?: Error) => void): void{
+        this._comms = {};
+        
         if(!this._worker)
             return _cb();
         
@@ -320,9 +437,12 @@ export class ClusterService extends BuiltInService {
 
 export class LocalService extends BuiltInService {
     private _impl: Service;
-    constructor(service: string, log: nulllogger.INullLogger, paths: paths, config: any) {
-        super(service, log, paths, config);
+    constructor(service: string, commRegistry: nexusfork.ServiceCommRegistry, log: nulllogger.INullLogger, paths: paths, config: any) {
+        super(service, commRegistry, log, paths, config);
         this._impl = this.newService();
+    }
+    protected openComm0(cb: (err: Error, comm?: nexusfork.ServiceComm) => void): void{
+        this._impl.openComm(cb);
     }
     protected start0(cb: (err?: Error) => void): void{
         this._impl.start(cb);
@@ -334,17 +454,17 @@ export class LocalService extends BuiltInService {
 
 const WorkerCount = process.env['WORKER_COUNT'];
 const CPUCount = Math.max(1, (WorkerCount && parseInt(WorkerCount)) || os.cpus().length);
-const DistributedServiceImpl = CPUCount > 1 ? ClusterService : LocalService;
+export const DistributedServiceImpl = CPUCount > 1 ? ClusterService : LocalService;
 
 export class DistributedService extends ServiceGroup {
-    constructor(service: string, log: nulllogger.INullLogger, paths: paths, config: any) {
+    constructor(service: string, commRegistry: nexusfork.ServiceCommRegistry, log: nulllogger.INullLogger, paths: paths, config: any) {
         super(log.extend(service));
         if(CPUCount > 1)
             for(var i=0; i<CPUCount; i++) {
-                this.add(new DistributedServiceImpl(service, this._logger.extend("" + (i+1)), paths, config));
+                this.add(new DistributedServiceImpl(service, commRegistry, this._logger.extend("" + (i+1)), paths, config));
             }
         else
-            this.add(new DistributedServiceImpl(service, this._logger, paths, config));
+            this.add(new DistributedServiceImpl(service, commRegistry, this._logger, paths, config));
     }
 }
 

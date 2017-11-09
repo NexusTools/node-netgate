@@ -3,7 +3,7 @@ import log = require("nulllogger");
 
 const logger = new log();
 const service = require(process.env.service).default;
-const _impl: Service = new service(logger, JSON.parse(process.env.config));
+const _impl: Service = new service(logger, JSON.parse(process.env.config), undefined);
 
 const start = function() {
     try {
@@ -29,6 +29,9 @@ const start = function() {
 process.on("message", function(msg) {
     try {
         switch(msg.cmd) {
+            case "exit":
+                process.exit(0);
+                break;
             case "start":
                 start();
                 break;

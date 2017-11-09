@@ -1,12 +1,65 @@
-import { ServiceGroup, DistributedService } from "./service";
+import { Service, ServiceGroup, DistributedService, DistributedServiceImpl } from "./service";
 import logger = require("nulllogger");
 import paths = require("node-paths");
 import { nexusfork } from "../types";
 import path = require("path");
 import _ = require("lodash");
 
+class NexusForkServiceCommRegistry implements nexusfork.ServiceCommRegistry {
+    private _nexusfork: NexusFork;
+    constructor(nexusfork: NexusFork) {
+        this._nexusfork = nexusfork;
+    }
+    open(service: string, cb: (err: Error, comm?: nexusfork.ServiceComm) => void): void{
+        this._nexusfork['_servicesByName'][service].openComm(cb);
+    }
+    emit0(service: string, args: any[]) {
+        const pending = this._nexusfork['_pendingComsByName'][service];
+        if(!pending) {
+            this._nexusfork['_servicesByName'][service].openComm((err, comm) => {
+                if(err)
+                    this._nexusfork['_pendingComsByName'][service].forEach((args) => {
+                        if(_.isFunction(args[0]))
+                            args[0](err);
+                    });
+                else {
+                    this._nexusfork['_pendingComsByName'][service].forEach(function(args) {
+                        if(_.isFunction(args[0]))
+                            comm.emitWithErrorHandler.apply(comm, args);
+                        else
+                            comm.emit.apply(comm, args);
+                    });
+                    this._nexusfork['_commsByName'][service] = comm;
+                }
+                delete this._nexusfork['_pendingComsByName'][service];
+            });
+        }
+        pending.push(args);
+    }
+    emitWithErrorHandler(service: string, event: string, onerror: (err: Error) => void, ...args: any[]): void{
+        var comm = this._nexusfork['_commsByName'][service];
+        args.unshift(event);
+        args.unshift(onerror);
+        if(comm)
+            comm.emitWithErrorHandler.apply(comm, args);
+        else
+            this.emit0(service, args);
+    }
+    emit(service: string, event: string, ...args: any[]): void{
+        var comm = this._nexusfork['_commsByName'][service];
+        args.unshift(event);
+        if(comm)
+            comm.emit.apply(comm, args);
+        else
+            this.emit0(service, args);
+    }
+}
+
 export class NexusFork extends ServiceGroup {
     readonly searchPaths: paths;
+    private readonly _servicesByName: {[index: string]: Service} = {};
+    private readonly _pendingComsByName: {[index: string]: any[][]} = {};
+    private readonly _commsByName: {[index: string]: nexusfork.ServiceComm} = {};
     static readonly INSTALL_PATH = new paths(path.dirname(__dirname));
     constructor(config?: string|nexusfork.Config, ...addons: string[]) {
         super(new logger("cyan:NexusFork"));
@@ -34,7 +87,7 @@ export class NexusFork extends ServiceGroup {
         });
         
         Object.defineProperty(this, "searchPaths", {
-            value: NexusFork.INSTALL_PATH.get(rootPath, NexusFork.INSTALL_PATH)
+            value: NexusFork.INSTALL_PATH.get(rootPath)
         });
 
         this._logger.info("Preparing", _config.name, "V" + _config.version);
@@ -108,8 +161,24 @@ export class NexusFork extends ServiceGroup {
             webHandlers[key] = handlers;
         }
         
-        if(Object.keys(webHandlers).length) {
-            this.add(new DistributedService("web", this._logger, this.searchPaths, webHandlers));
-        }
+        const commRegistry: nexusfork.ServiceCommRegistry = _config.services && _config.services.length ? new NexusForkServiceCommRegistry(this) : {
+            open(service, cb): void{
+                cb(new Error("No services registered with NexusFork."));
+            },
+            emitWithErrorHandler(service, event, cb, ...args: any[]): void{
+                cb(new Error("No services registered with NexusFork."));
+            },
+            emit(service, event, ...args): void{}
+        };
+        
+        if(Object.keys(webHandlers).length)
+            this.add(new DistributedService("web", commRegistry, this._logger, this.searchPaths, webHandlers));
+            
+        if (_config.services && _config.services.length)
+            _config.services.forEach((service) => {
+                const _service = new DistributedServiceImpl(service.service, commRegistry, this._logger, this.searchPaths, service);
+                this._servicesByName[service.service] = _service;
+                this.add(_service);
+            });
     }
 }

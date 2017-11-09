@@ -8,7 +8,7 @@
         }
     ],
     "homepage": "https://nexustools.com/",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "license": "Apache-2.0",
     "description": "Easily setup a cluster based http server using express and vhost.",
     "keywords": [
@@ -44,8 +44,7 @@
         "express": "^4.15.2",
         "lodash": "^4.17.4",
         "node-paths": "^0.2.2",
-        "nulllogger": "^0.5.2",
-        "vhost": "^3.0.2"
+        "nulllogger": "^0.5.2"
     },
     "devDependencies": {
         "@types/node": "^8.0.34",
