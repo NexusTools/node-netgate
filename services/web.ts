@@ -73,16 +73,13 @@ export default class WebService extends Service {
         var catchallLogger: nulllogger.INullLogger;
         const wildcards: {[0]: string, [1]: nexusfork.WebRequestHandler, [2]: nulllogger.INullLogger}[] = []; 
         const app = express();
+        const server = this._server = new http.Server(app);
+        const constants = {
+            type: "webhost",
+            server,
+            app
+        };
         try {
-            const self = this;
-            const constants = {
-                type: "webhost",
-                get server() {
-                    return self._server;
-                },
-                app
-            };
-            
             var hosts: {pattern: RegExp, handler: Function, logger: nulllogger.INullLogger}[] = [];
             app.use((req: nexusfork.WebRequest, res: nexusfork.WebResponse) => {
                 try {
@@ -381,9 +378,9 @@ export default class WebService extends Service {
         }
 
         if(process.env.HTTP_HOST)
-            this._server = app.listen(parseInt(process.env.HTTP_PORT) || 80, process.env.HTTP_HOST, cb);
+            server.listen(parseInt(process.env.HTTP_PORT) || 80, process.env.HTTP_HOST, cb);
         else
-            this._server = app.listen(parseInt(process.env.HTTP_PORT) || 80, cb);
+            server.listen(parseInt(process.env.HTTP_PORT) || 80, cb);
     }
     protected stop0(cb: (err?: Error) => void): void{
         this._server.close(cb);

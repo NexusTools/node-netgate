@@ -5,6 +5,7 @@ const service_1 = require("../src/service");
 const express = require("express");
 const argwrap = require("argwrap");
 const async = require("async");
+const http = require("http");
 const _ = require("lodash");
 const stages = ["install", "preroute", "route", "postroute", "ready"];
 const cbparams = ["cb", "callback", "next", "done"];
@@ -59,15 +60,13 @@ class WebService extends service_1.Service {
         var catchallLogger;
         const wildcards = [];
         const app = express();
+        const server = this._server = new http.Server(app);
+        const constants = {
+            type: "webhost",
+            server,
+            app
+        };
         try {
-            const self = this;
-            const constants = {
-                type: "webhost",
-                get server() {
-                    return self._server;
-                },
-                app
-            };
             var hosts = [];
             app.use((req, res) => {
                 try {
@@ -384,9 +383,9 @@ class WebService extends service_1.Service {
             return cb(e);
         }
         if (process.env.HTTP_HOST)
-            this._server = app.listen(parseInt(process.env.HTTP_PORT) || 80, process.env.HTTP_HOST, cb);
+            server.listen(parseInt(process.env.HTTP_PORT) || 80, process.env.HTTP_HOST, cb);
         else
-            this._server = app.listen(parseInt(process.env.HTTP_PORT) || 80, cb);
+            server.listen(parseInt(process.env.HTTP_PORT) || 80, cb);
     }
     stop0(cb) {
         this._server.close(cb);
