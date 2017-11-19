@@ -49,11 +49,11 @@ export = function (code: number, title?: string, message?: string, extras?: stri
     });
 
     return function nexusfork_internal(req, res, more?: any) {
-        var thisdata;
+        var thisdata: Buffer;
         if(more)
-            thisdata = data.replace(/{{more}}/g, more);
+            thisdata = Buffer.from(data.replace(/{{more}}/g, more), "utf8");
         else
-            thisdata = data.replace(/{{more}}/g, "");
+            thisdata = Buffer.from(data.replace(/{{more}}/g, ""), "utf8");
         res.writeHead(code, {
             "Content-Type": "text/html; charset=utf-8",
             "Content-Length": thisdata.length

@@ -1,10 +1,10 @@
 "use strict";
-exports.__esModule = true;
-var log = require("nulllogger");
-var logger = new log();
-var service = require(process.env.service)["default"];
-var _impl = new service(logger, JSON.parse(process.env.config), undefined);
-var start = function () {
+Object.defineProperty(exports, "__esModule", { value: true });
+const log = require("nulllogger");
+const logger = new log();
+const service = require(process.env.service).default;
+const _impl = new service(logger, JSON.parse(process.env.config), undefined);
+const start = function () {
     try {
         _impl.start(function (err) {
             if (err)

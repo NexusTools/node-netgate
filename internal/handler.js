@@ -46,9 +46,9 @@ module.exports = function (code, title, message, extras, footer) {
     return function nexusfork_internal(req, res, more) {
         var thisdata;
         if (more)
-            thisdata = data.replace(/{{more}}/g, more);
+            thisdata = Buffer.from(data.replace(/{{more}}/g, more), "utf8");
         else
-            thisdata = data.replace(/{{more}}/g, "");
+            thisdata = Buffer.from(data.replace(/{{more}}/g, ""), "utf8");
         res.writeHead(code, {
             "Content-Type": "text/html; charset=utf-8",
             "Content-Length": thisdata.length

@@ -1,26 +1,16 @@
 "use strict";
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-exports.__esModule = true;
-var internal = require("../internal/handler");
-var service_1 = require("../src/service");
-var express = require("express");
-var argwrap = require("argwrap");
-var async = require("async");
-var _ = require("lodash");
-var stages = ["install", "preroute", "route", "postroute", "ready"];
-var cbparams = ["cb", "callback", "next", "done"];
-var reqparams = ["req", "request", "r1"];
-var resparams = ["res", "response", "r2"];
-var catchallPattern = /.+/;
+Object.defineProperty(exports, "__esModule", { value: true });
+const internal = require("../internal/handler");
+const service_1 = require("../src/service");
+const express = require("express");
+const argwrap = require("argwrap");
+const async = require("async");
+const _ = require("lodash");
+const stages = ["install", "preroute", "route", "postroute", "ready"];
+const cbparams = ["cb", "callback", "next", "done"];
+const reqparams = ["req", "request", "r1"];
+const resparams = ["res", "response", "r2"];
+const catchallPattern = /.+/;
 function makeRegexFromDomain(path) {
     return new RegExp("^" + path.replace(/\$/g, "\\$").replace(/\^/g, "\\^") + "$", 'i');
 }
@@ -46,12 +36,8 @@ function isRequestHandler(argnames) {
         && (argnames.length < 2 || resparams.indexOf(argnames[1]) != -1)
         && (argnames.length < 3 || cbparams.indexOf(argnames[2]) != -1);
 }
-var pushToAsync = function () {
-    var items = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        items[_i] = arguments[_i];
-    }
-    var _items = [];
+const pushToAsync = function (...items) {
+    const _items = [];
     items.forEach(function (item) {
         _items.push(function (cb) {
             cb(undefined, item());
@@ -59,33 +45,34 @@ var pushToAsync = function () {
     });
     return Array.prototype.push.apply(this, _items);
 };
-var WebService = /** @class */ (function (_super) {
-    __extends(WebService, _super);
-    function WebService(log, config, services) {
-        var _this = _super.call(this, log) || this;
-        _this._config = config;
-        _this._services = services;
-        return _this;
+class WebService extends service_1.Service {
+    constructor(log, config, services) {
+        super(log);
+        this._config = config;
+        this._services = services;
     }
-    WebService.prototype.openComm0 = function (cb) {
+    openComm0(cb) {
         cb(new Error("WebService does not support ServiceComm..."));
-    };
-    WebService.prototype.start0 = function (cb) {
-        var _this = this;
+    }
+    start0(cb) {
         var catchall;
         var catchallLogger;
-        var wildcards = [];
-        var app = express();
+        const wildcards = [];
+        const app = express();
         try {
-            var constants_1 = {
+            const self = this;
+            const constants = {
                 type: "webhost",
-                app: app
+                get server() {
+                    return self._server;
+                },
+                app
             };
             var hosts = [];
-            app.use(function (req, res) {
+            app.use((req, res) => {
                 try {
                     Object.defineProperty(req, "services", {
-                        value: _this._services
+                        value: this._services
                     });
                 }
                 catch (e) { }
@@ -94,9 +81,9 @@ var WebService = /** @class */ (function (_super) {
                         configurable: true,
                         value: function (err) {
                             if (err)
-                                failureerr_1(req, res, err);
+                                failureerr(req, res, err);
                             else
-                                failure_1(req, res);
+                                failure(req, res);
                         }
                     });
                 }
@@ -104,19 +91,22 @@ var WebService = /** @class */ (function (_super) {
                 try {
                     Object.defineProperty(res, "sendStatus", {
                         configurable: true,
-                        value: function (code) {
+                        value: function (code, err) {
                             switch (code) {
                                 case 403:
-                                    internal403_1(req, res);
+                                    internal403(req, res);
                                     break;
                                 case 404:
-                                    internal404_1(req, res);
+                                    internal404(req, res);
                                     break;
                                 case 503:
-                                    startup_1(req, res);
+                                    startup(req, res);
                                     break;
                                 default:
-                                    failure_1(req, res);
+                                    if (err)
+                                        failureerr(req, res, err);
+                                    else
+                                        failure(req, res);
                                     break;
                             }
                         }
@@ -143,7 +133,7 @@ var WebService = /** @class */ (function (_super) {
                             catch (e) { }
                             host.handler(req, res, function (err) {
                                 if (err)
-                                    failureerr_1(req, res, err);
+                                    failureerr(req, res, err);
                                 else
                                     res.sendStatus(404);
                             });
@@ -158,77 +148,77 @@ var WebService = /** @class */ (function (_super) {
                 }
                 res.sendStatus(404);
             });
-            var startup_1 = internal(503);
-            var failure_1 = internal(500);
-            var internal404_1 = internal(404);
-            var internal403_1 = internal(403);
-            var failureerr_1 = function (req, res, err) {
-                failure_1(req, res, "<code style=\"padding: 6px; background: red; color: white; border-radius: 6px; margin: 6px 0; display: block\">" + err + "</code>");
+            const startup = internal(503);
+            const failure = internal(500);
+            const internal404 = internal(404);
+            const internal403 = internal(403);
+            const failureerr = function (req, res, err) {
+                failure(req, res, "<code style=\"padding: 6px; background: red; color: white; border-radius: 6px; margin: 6px 0; display: block\">" + err + "</code>");
             };
-            Object.keys(this._config).forEach(function (host) {
-                var logger = _this._logger.extend("R:" + host);
+            Object.keys(this._config).forEach((host) => {
+                const logger = this._logger.extend("R:" + host);
                 logger.gears("Processing", host);
-                var webconstants = _.extend({
-                    host: host,
-                    logger: logger
-                }, constants_1);
-                var stageImpls = {};
+                const webconstants = _.extend({
+                    host,
+                    logger
+                }, constants);
+                const stageImpls = {};
                 stages.forEach(function (stage) {
                     stageImpls[stage] = [];
                 });
                 var hasAsync;
-                var makeAsync = function () {
+                const makeAsync = function () {
                     if (hasAsync)
                         return;
                     hasAsync = true;
                     stages.forEach(function (stage) {
-                        var existing = stageImpls[stage];
+                        const existing = stageImpls[stage];
                         (stageImpls[stage] = []).push = pushToAsync;
                         pushToAsync.apply(stageImpls[stage], existing);
                     });
                 };
-                _this._config[host].forEach(function (config) {
+                this._config[host].forEach((config) => {
                     var asyncParam;
                     var handler = require(config.handler);
-                    if (_.isFunction(handler["default"]))
-                        handler = handler["default"];
+                    if (_.isFunction(handler.default))
+                        handler = handler.default;
                     if (_.isFunction(handler)) {
-                        var argdata = argwrap.wrap0(handler);
+                        const argdata = argwrap.wrap0(handler);
                         logger.gears("Detected arguments", argdata);
                         if (isRequestHandler(argdata[1])) {
-                            var impl_1 = handler;
+                            const impl = handler;
                             stageImpls['route'].push(function () {
-                                return impl_1;
+                                return impl;
                             });
                         }
                         else if (asyncParam = isAsyncHandler(argdata[1])) {
                             makeAsync();
-                            var consts_1 = _.extend({
-                                config: config
+                            const consts = _.extend({
+                                config
                             }, webconstants);
-                            var _handler_1 = argdata[0];
+                            const _handler = argdata[0];
                             Array.prototype.push.call(stageImpls['route'], function (cb) {
                                 var _cb = {};
                                 _cb[asyncParam] = cb;
-                                _handler_1(_.extend(_cb, consts_1));
+                                _handler(_.extend(_cb, consts));
                             });
                         }
                         else {
-                            var consts_2 = _.extend({
-                                config: config
+                            const consts = _.extend({
+                                config
                             }, webconstants);
-                            var _handler_2 = argdata[0];
+                            const _handler = argdata[0];
                             stageImpls['route'].push(function () {
-                                return _handler_2(consts_2);
+                                return _handler(consts);
                             });
                         }
                     }
                     else if (_.isObject(handler)) {
                         Object.keys(handler).forEach(function (stage) {
                             var asyncParam;
-                            var impl = handler[stage];
+                            const impl = handler[stage];
                             if (_.isFunction(impl)) {
-                                var argdata = argwrap.wrap0(impl);
+                                const argdata = argwrap.wrap0(impl);
                                 logger.gears("Detected arguments for stage", stage, argdata[1]);
                                 if (isRequestHandler(argdata[1]))
                                     stageImpls['route'].push(function () {
@@ -236,23 +226,23 @@ var WebService = /** @class */ (function (_super) {
                                     });
                                 else if (asyncParam = isAsyncHandler(argdata[1])) {
                                     makeAsync();
-                                    var consts_3 = _.extend({
-                                        config: config
+                                    const consts = _.extend({
+                                        config
                                     }, webconstants);
-                                    var _handler_3 = argdata[0];
+                                    const _handler = argdata[0];
                                     Array.prototype.push.call(stageImpls['route'], function (cb) {
                                         var _cb = {};
                                         _cb[asyncParam] = cb;
-                                        _handler_3(_.extend(_cb, consts_3));
+                                        _handler(_.extend(_cb, consts));
                                     });
                                 }
                                 else {
-                                    var consts_4 = _.extend({
-                                        config: config
+                                    const consts = _.extend({
+                                        config
                                     }, webconstants);
-                                    var _handler_4 = argdata[0];
+                                    const _handler = argdata[0];
                                     stageImpls['route'].push(function () {
-                                        return _handler_4(consts_4);
+                                        return _handler(consts);
                                     });
                                 }
                             }
@@ -264,13 +254,13 @@ var WebService = /** @class */ (function (_super) {
                         throw new Error("Handler must be Object or Function.");
                 });
                 var handler;
-                var hoststack = [];
+                const hoststack = [];
                 if (hasAsync) {
                     var ready;
                     var errored;
-                    handler = function (req, res, next) {
+                    handler = (req, res, next) => {
                         if (errored)
-                            failure_1(req, res);
+                            failure(req, res);
                         else if (ready) {
                             async.eachSeries(hoststack, function (impl, cb) {
                                 try {
@@ -282,19 +272,19 @@ var WebService = /** @class */ (function (_super) {
                             }, function (err) {
                                 if (err) {
                                     logger.error(err);
-                                    failure_1(req, res);
+                                    failure(req, res);
                                 }
                                 else
                                     next();
                             });
                         }
                         else
-                            startup_1(req, res);
+                            startup(req, res);
                     };
                     async.eachSeries(stages, function (stage, cb) {
                         async.eachSeries(stageImpls[stage], function (impl, rcb) {
                             var called = false;
-                            var cb = function (err) {
+                            const cb = function (err) {
                                 if (called) {
                                     if (called === true && err)
                                         console.error("Error called after success...", err.stack);
@@ -339,7 +329,7 @@ var WebService = /** @class */ (function (_super) {
                         if (!hoststack.length)
                             return; // Don't setup
                         if (hoststack.length > 1)
-                            handler = function (req, res, next) {
+                            handler = (req, res, next) => {
                                 async.eachSeries(hoststack, function (impl, cb) {
                                     try {
                                         impl(req, res, cb);
@@ -349,7 +339,7 @@ var WebService = /** @class */ (function (_super) {
                                     }
                                 }, function (err) {
                                     if (err)
-                                        failure_1(req, res);
+                                        failure(req, res);
                                     else
                                         next();
                                 });
@@ -359,7 +349,7 @@ var WebService = /** @class */ (function (_super) {
                     }
                     catch (e) {
                         logger.error(e);
-                        handler = failure_1;
+                        handler = failure;
                     }
                 }
                 if (host == "*") {
@@ -370,9 +360,9 @@ var WebService = /** @class */ (function (_super) {
                     wildcards.push([host, handler, logger]);
                 else
                     hosts.push({
-                        logger: logger,
+                        logger,
                         pattern: makeRegexFromDomain(host),
-                        handler: handler
+                        handler
                     });
             });
             wildcards.forEach(function (wildcard) {
@@ -397,11 +387,10 @@ var WebService = /** @class */ (function (_super) {
             this._server = app.listen(parseInt(process.env.HTTP_PORT) || 80, process.env.HTTP_HOST, cb);
         else
             this._server = app.listen(parseInt(process.env.HTTP_PORT) || 80, cb);
-    };
-    WebService.prototype.stop0 = function (cb) {
+    }
+    stop0(cb) {
         this._server.close(cb);
-    };
-    return WebService;
-}(service_1.Service));
-exports["default"] = WebService;
+    }
+}
+exports.default = WebService;
 //# sourceMappingURL=web.js.map

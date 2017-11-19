@@ -1,56 +1,41 @@
 "use strict";
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-exports.__esModule = true;
-var service_1 = require("./service");
-var logger = require("nulllogger");
-var paths = require("node-paths");
-var path = require("path");
-var _ = require("lodash");
-var NexusForkServiceCommRegistry = /** @class */ (function () {
-    function NexusForkServiceCommRegistry(nexusfork) {
+Object.defineProperty(exports, "__esModule", { value: true });
+const service_1 = require("./service");
+const logger = require("nulllogger");
+const paths = require("node-paths");
+const path = require("path");
+const _ = require("lodash");
+class NexusForkServiceCommRegistry {
+    constructor(nexusfork) {
         this._nexusfork = nexusfork;
     }
-    NexusForkServiceCommRegistry.prototype.open = function (service, cb) {
+    open(service, cb) {
         this._nexusfork['_servicesByName'][service].openComm(cb);
-    };
-    NexusForkServiceCommRegistry.prototype.emit0 = function (service, args) {
-        var _this = this;
-        var pending = this._nexusfork['_pendingComsByName'][service];
+    }
+    emit0(service, args) {
+        const pending = this._nexusfork['_pendingComsByName'][service];
         if (!pending) {
-            this._nexusfork['_servicesByName'][service].openComm(function (err, comm) {
+            this._nexusfork['_servicesByName'][service].openComm((err, comm) => {
                 if (err)
-                    _this._nexusfork['_pendingComsByName'][service].forEach(function (args) {
+                    this._nexusfork['_pendingComsByName'][service].forEach((args) => {
                         if (_.isFunction(args[0]))
                             args[0](err);
                     });
                 else {
-                    _this._nexusfork['_pendingComsByName'][service].forEach(function (args) {
+                    this._nexusfork['_pendingComsByName'][service].forEach(function (args) {
                         if (_.isFunction(args[0]))
                             comm.emitWithErrorHandler.apply(comm, args);
                         else
                             comm.emit.apply(comm, args);
                     });
-                    _this._nexusfork['_commsByName'][service] = comm;
+                    this._nexusfork['_commsByName'][service] = comm;
                 }
-                delete _this._nexusfork['_pendingComsByName'][service];
+                delete this._nexusfork['_pendingComsByName'][service];
             });
         }
         pending.push(args);
-    };
-    NexusForkServiceCommRegistry.prototype.emitWithErrorHandler = function (service, event, onerror) {
-        var args = [];
-        for (var _i = 3; _i < arguments.length; _i++) {
-            args[_i - 3] = arguments[_i];
-        }
+    }
+    emitWithErrorHandler(service, event, onerror, ...args) {
         var comm = this._nexusfork['_commsByName'][service];
         args.unshift(event);
         args.unshift(onerror);
@@ -58,42 +43,26 @@ var NexusForkServiceCommRegistry = /** @class */ (function () {
             comm.emitWithErrorHandler.apply(comm, args);
         else
             this.emit0(service, args);
-    };
-    NexusForkServiceCommRegistry.prototype.emit = function (service, event) {
-        var args = [];
-        for (var _i = 2; _i < arguments.length; _i++) {
-            args[_i - 2] = arguments[_i];
-        }
+    }
+    emit(service, event, ...args) {
         var comm = this._nexusfork['_commsByName'][service];
         args.unshift(event);
         if (comm)
             comm.emit.apply(comm, args);
         else
             this.emit0(service, args);
-    };
-    return NexusForkServiceCommRegistry;
-}());
-var NexusFork = /** @class */ (function (_super) {
-    __extends(NexusFork, _super);
-    function NexusFork(config) {
-        var addons = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            addons[_i - 1] = arguments[_i];
-        }
-        var _this = _super.call(this, new logger("cyan:NexusFork")) || this;
-        _this._servicesByName = {};
-        _this._pendingComsByName = {};
-        _this._commsByName = {};
-        addons.unshift(config);
-        _this.loadConfig.apply(_this, addons);
-        return _this;
     }
-    NexusFork.prototype.loadConfig = function (config) {
-        var _this = this;
-        var addons = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            addons[_i - 1] = arguments[_i];
-        }
+}
+class NexusFork extends service_1.ServiceGroup {
+    constructor(config, ...addons) {
+        super(new logger("cyan:NexusFork"));
+        this._servicesByName = {};
+        this._pendingComsByName = {};
+        this._commsByName = {};
+        addons.unshift(config);
+        this.loadConfig.apply(this, addons);
+    }
+    loadConfig(config, ...addons) {
         var rootPath;
         if (!config || _.isString(config)) {
             rootPath = path.resolve(config || require.main.id);
@@ -101,8 +70,8 @@ var NexusFork = /** @class */ (function (_super) {
         }
         else
             rootPath = process.cwd();
-        var _config = config;
-        var loadedAddons = [];
+        const _config = config;
+        const loadedAddons = [];
         addons.forEach(function (addon) {
             var _addon = require(addon);
             if (_addon['default'])
@@ -130,7 +99,7 @@ var NexusFork = /** @class */ (function (_super) {
             throw new Error("Expected `hosts` or `wwwroot` in configuration");
         if (!_.isObject(_config.hosts))
             throw new Error("`hosts` must be an Object, where the key is a host pattern and the value is the host configuration");
-        var webHandlers = {};
+        const webHandlers = {};
         for (var key in _config.hosts) {
             var host = _config.hosts[key];
             if (!Array.isArray(host)) {
@@ -150,7 +119,7 @@ var NexusFork = /** @class */ (function (_super) {
                     addon.prewebhost(key, host);
             });
             var handlers = [];
-            host.forEach(function (entry) {
+            host.forEach((entry) => {
                 if (_.isString(entry))
                     entry = {
                         handler: "static",
@@ -165,7 +134,7 @@ var NexusFork = /** @class */ (function (_super) {
                 if (entry.root)
                     entry.root = path.resolve(rootPath, entry.root);
                 try {
-                    entry.handler = _this.searchPaths.resolve("handlers/" + entry.handler + ".js");
+                    entry.handler = this.searchPaths.resolve("handlers/" + entry.handler + ".js");
                 }
                 catch (e) { }
                 handlers.push(entry);
@@ -177,35 +146,25 @@ var NexusFork = /** @class */ (function (_super) {
             });
             webHandlers[key] = handlers;
         }
-        var commRegistry = _config.services && _config.services.length ? new NexusForkServiceCommRegistry(this) : {
-            open: function (service, cb) {
+        const commRegistry = _config.services && _config.services.length ? new NexusForkServiceCommRegistry(this) : {
+            open(service, cb) {
                 cb(new Error("No services registered with NexusFork."));
             },
-            emitWithErrorHandler: function (service, event, cb) {
-                var args = [];
-                for (var _i = 3; _i < arguments.length; _i++) {
-                    args[_i - 3] = arguments[_i];
-                }
+            emitWithErrorHandler(service, event, cb, ...args) {
                 cb(new Error("No services registered with NexusFork."));
             },
-            emit: function (service, event) {
-                var args = [];
-                for (var _i = 2; _i < arguments.length; _i++) {
-                    args[_i - 2] = arguments[_i];
-                }
-            }
+            emit(service, event, ...args) { }
         };
         if (Object.keys(webHandlers).length)
             this.add(new service_1.DistributedService("web", commRegistry, this._logger, this.searchPaths, webHandlers));
         if (_config.services && _config.services.length)
-            _config.services.forEach(function (service) {
-                var _service = new service_1.DistributedServiceImpl(service.service, commRegistry, _this._logger, _this.searchPaths, service);
-                _this._servicesByName[service.service] = _service;
-                _this.add(_service);
+            _config.services.forEach((service) => {
+                const _service = new service_1.DistributedServiceImpl(service.service, commRegistry, this._logger, this.searchPaths, service);
+                this._servicesByName[service.service] = _service;
+                this.add(_service);
             });
-    };
-    NexusFork.INSTALL_PATH = new paths(path.dirname(__dirname));
-    return NexusFork;
-}(service_1.ServiceGroup));
+    }
+}
+NexusFork.INSTALL_PATH = new paths(path.dirname(__dirname));
 exports.NexusFork = NexusFork;
 //# sourceMappingURL=nexusfork.js.map

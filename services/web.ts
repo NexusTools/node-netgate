@@ -74,8 +74,12 @@ export default class WebService extends Service {
         const wildcards: {[0]: string, [1]: nexusfork.WebRequestHandler, [2]: nulllogger.INullLogger}[] = []; 
         const app = express();
         try {
+            const self = this;
             const constants = {
                 type: "webhost",
+                get server() {
+                    return self._server;
+                },
                 app
             };
             
@@ -100,7 +104,7 @@ export default class WebService extends Service {
                 try {
                     Object.defineProperty(res, "sendStatus", {
                         configurable: true,
-                        value: function(code: number) {
+                        value: function(code: number, err?: Error) {
                             switch(code) {
                                 case 403:
                                     internal403(req, res);
@@ -112,7 +116,10 @@ export default class WebService extends Service {
                                     startup(req, res);
                                     break;
                                 default:
-                                    failure(req, res);
+                                    if(err)
+                                        failureerr(req, res, err);
+                                    else
+                                        failure(req, res);
                                     break;
                             }
                         }

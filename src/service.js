@@ -1,22 +1,12 @@
 "use strict";
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-exports.__esModule = true;
-var cluster = require("cluster");
-var events = require("events");
-var crypto = require("crypto");
-var async = require("async");
-var path = require("path");
-var _ = require("lodash");
-var os = require("os");
+Object.defineProperty(exports, "__esModule", { value: true });
+const cluster = require("cluster");
+const events = require("events");
+const crypto = require("crypto");
+const async = require("async");
+const path = require("path");
+const _ = require("lodash");
+const os = require("os");
 var ServiceState;
 (function (ServiceState) {
     ServiceState[ServiceState["Stopped"] = 0] = "Stopped";
@@ -24,64 +14,59 @@ var ServiceState;
     ServiceState[ServiceState["Started"] = 2] = "Started";
     ServiceState[ServiceState["Stopping"] = 3] = "Stopping";
 })(ServiceState = exports.ServiceState || (exports.ServiceState = {}));
-var Service = /** @class */ (function (_super) {
-    __extends(Service, _super);
-    function Service(log, quiet) {
-        if (quiet === void 0) { quiet = false; }
-        var _this = _super.call(this) || this;
-        _this._state = ServiceState.Stopped;
-        _this._quiet = quiet;
-        _this._logger = log;
-        return _this;
+class Service extends events.EventEmitter {
+    constructor(log, quiet = false) {
+        super();
+        this._state = ServiceState.Stopped;
+        this._quiet = quiet;
+        this._logger = log;
     }
-    Service.prototype.state = function () {
+    state() {
         return this._state;
-    };
-    Service.prototype.openComm = function (cb) {
-        var _this = this;
+    }
+    openComm(cb) {
         switch (this._state) {
             case ServiceState.Started:
                 this.openComm0(cb);
                 break;
             case ServiceState.Starting:
-                this._cbstack.push(function (err) {
+                this._cbstack.push((err) => {
                     if (err)
                         cb(err);
                     else
-                        _this.openComm(cb);
+                        this.openComm(cb);
                 });
                 break;
             default:
                 cb(new Error("Cannot stop service while in `" + ServiceState[this._state] + "` state"));
         }
-    };
-    Service.prototype.start = function (cb) {
-        var _this = this;
+    }
+    start(cb) {
         if (!cb)
-            cb = function (err) {
-                _this.emit("error", err);
+            cb = (err) => {
+                this.emit("error", err);
             };
         switch (this._state) {
             case ServiceState.Stopped:
                 this._state = ServiceState.Starting;
                 this.emit("starting");
                 this._cbstack = [cb];
-                this.start0(function (err) {
+                this.start0((err) => {
                     if (err) {
-                        _this._state = ServiceState.Stopped;
-                        if (!_this._quiet)
-                            _this._logger.error(err);
-                        _this.emit("error", err);
-                        _this._cbstack.forEach(function (cb) {
+                        this._state = ServiceState.Stopped;
+                        if (!this._quiet)
+                            this._logger.error(err);
+                        this.emit("error", err);
+                        this._cbstack.forEach(function (cb) {
                             cb(err);
                         });
                     }
                     else {
-                        _this._state = ServiceState.Started;
-                        if (!_this._quiet)
-                            _this._logger.info("Started");
-                        _this.emit("started");
-                        _this._cbstack.forEach(function (cb) {
+                        this._state = ServiceState.Started;
+                        if (!this._quiet)
+                            this._logger.info("Started");
+                        this.emit("started");
+                        this._cbstack.forEach(function (cb) {
                             cb();
                         });
                     }
@@ -96,33 +81,32 @@ var Service = /** @class */ (function (_super) {
             default:
                 cb(new Error("Cannot start service while in `" + ServiceState[this._state] + "` state"));
         }
-    };
-    Service.prototype.stop = function (cb) {
-        var _this = this;
+    }
+    stop(cb) {
         if (!cb)
-            cb = function (err) {
-                _this.emit("error", err);
+            cb = (err) => {
+                this.emit("error", err);
             };
         switch (this._state) {
             case ServiceState.Started:
                 this._state = ServiceState.Stopping;
                 this.emit("stopping");
                 this._cbstack = [cb];
-                this.stop0(function (err) {
-                    _this._state = ServiceState.Stopped;
+                this.stop0((err) => {
+                    this._state = ServiceState.Stopped;
                     if (err) {
-                        if (!_this._quiet)
-                            _this._logger.error(err);
-                        _this.emit("error", err);
-                        _this._cbstack.forEach(function (cb) {
+                        if (!this._quiet)
+                            this._logger.error(err);
+                        this.emit("error", err);
+                        this._cbstack.forEach(function (cb) {
                             cb(err);
                         });
                     }
                     else {
-                        if (!_this._quiet)
-                            _this._logger.info("Stopped");
-                        _this.emit("stopped");
-                        _this._cbstack.forEach(function (cb) {
+                        if (!this._quiet)
+                            this._logger.info("Stopped");
+                        this.emit("stopped");
+                        this._cbstack.forEach(function (cb) {
                             cb();
                         });
                     }
@@ -137,38 +121,27 @@ var Service = /** @class */ (function (_super) {
             default:
                 cb(new Error("Cannot stop service while in `" + ServiceState[this._state] + "` state"));
         }
-    };
-    return Service;
-}(events.EventEmitter));
-exports.Service = Service;
-var SimpleCommService = /** @class */ (function (_super) {
-    __extends(SimpleCommService, _super);
-    function SimpleCommService() {
-        var _this = _super !== null && _super.apply(this, arguments) || this;
-        _this._events = {};
-        return _this;
     }
-    SimpleCommService.prototype.openComm0 = function (cb) {
-        var self = this;
-        var myEvents = {};
+}
+exports.Service = Service;
+class SimpleCommService extends Service {
+    constructor() {
+        super(...arguments);
+        this._events = {};
+    }
+    openComm0(cb) {
+        const self = this;
+        const myEvents = {};
         cb(undefined, {
-            emit: function (event) {
-                var args = [];
-                for (var _i = 1; _i < arguments.length; _i++) {
-                    args[_i - 1] = arguments[_i];
-                }
+            emit(event, ...args) {
                 args.unshift(event);
                 args.unshift(undefined);
                 self.handleCommEmit.apply(self, args);
             },
-            emitWithErrorHandler: function (onerror, event) {
-                var args = [];
-                for (var _i = 2; _i < arguments.length; _i++) {
-                    args[_i - 2] = arguments[_i];
-                }
+            emitWithErrorHandler(onerror, event, ...args) {
                 self.handleCommEmit.apply(self, arguments);
             },
-            off: function (event, cb) {
+            off(event, cb) {
                 if (cb) {
                     var events = self._events[event];
                     if (events) {
@@ -181,42 +154,39 @@ var SimpleCommService = /** @class */ (function (_super) {
                 else
                     delete self._events[event];
             },
-            on: function (event, cb) {
+            on(event, cb) {
                 var events = self._events[event];
                 if (!events)
                     events = self._events[event] = [];
                 events.push(cb);
             },
-            close: function () {
+            close() {
             }
         });
-    };
-    SimpleCommService.prototype.hasEvent = function (event) {
-        return true;
-    };
-    return SimpleCommService;
-}(Service));
-exports.SimpleCommService = SimpleCommService;
-var ServiceGroup = /** @class */ (function (_super) {
-    __extends(ServiceGroup, _super);
-    function ServiceGroup(log) {
-        var _this = _super.call(this, log, true) || this;
-        _this._services = [];
-        return _this;
     }
-    ServiceGroup.prototype.add = function (service) {
+    hasEvent(event) {
+        return true;
+    }
+}
+exports.SimpleCommService = SimpleCommService;
+class ServiceGroup extends Service {
+    constructor(log) {
+        super(log, true);
+        this._services = [];
+    }
+    add(service) {
         if (this._services.indexOf(service) == -1)
             this._services.push(service);
-    };
-    ServiceGroup.prototype.remove = function (service) {
-        var index = this._services.indexOf(service);
+    }
+    remove(service) {
+        const index = this._services.indexOf(service);
         if (index > -1)
             this._services.splice(index, 1);
-    };
-    ServiceGroup.prototype.openComm0 = function (cb) {
+    }
+    openComm0(cb) {
         cb(new Error("ServiceGroup's do not support ServiceComm..."));
-    };
-    ServiceGroup.prototype.start0 = function (cb) {
+    }
+    start0(cb) {
         var started = [];
         async.each(this._services, function (service, cb) {
             service.start(function (err) {
@@ -231,8 +201,8 @@ var ServiceGroup = /** @class */ (function (_super) {
                 });
             cb(err);
         });
-    };
-    ServiceGroup.prototype.stop0 = function (cb) {
+    }
+    stop0(cb) {
         var err = [];
         async.each(this._services, function (service, cb) {
             service.stop(function (e) {
@@ -243,86 +213,67 @@ var ServiceGroup = /** @class */ (function (_super) {
         }, function () {
             cb(err.length ? err[0] : undefined);
         });
-    };
-    return ServiceGroup;
-}(Service));
+    }
+}
 exports.ServiceGroup = ServiceGroup;
-var BuiltInService = /** @class */ (function (_super) {
-    __extends(BuiltInService, _super);
-    function BuiltInService(service, commRegistry, log, paths, config) {
-        var _this = _super.call(this, log, true) || this;
-        _this._config = config;
-        _this._service = paths.resolve("services/" + service + ".js");
-        return _this;
+class BuiltInService extends Service {
+    constructor(service, commRegistry, log, paths, config) {
+        super(log, true);
+        this._config = config;
+        this._service = paths.resolve("services/" + service + ".js");
     }
-    BuiltInService.prototype.requireService = function () {
+    requireService() {
         return require(this._service)['default'];
-    };
-    BuiltInService.prototype.newService = function () {
-        var _service = this.requireService();
+    }
+    newService() {
+        const _service = this.requireService();
         return new _service(this._logger, this._config, this._commRegistry);
-    };
-    return BuiltInService;
-}(Service));
+    }
+}
 exports.BuiltInService = BuiltInService;
-var ClusterServiceComm = /** @class */ (function () {
-    function ClusterServiceComm() {
+class ClusterServiceComm {
+    emit(event, ...args) {
     }
-    ClusterServiceComm.prototype.emit = function (event) {
-        var args = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            args[_i - 1] = arguments[_i];
-        }
-    };
-    ClusterServiceComm.prototype.emitWithErrorHandler = function (onerror, event) {
-        var args = [];
-        for (var _i = 2; _i < arguments.length; _i++) {
-            args[_i - 2] = arguments[_i];
-        }
-    };
-    ClusterServiceComm.prototype.on = function (event, cb) {
-    };
-    ClusterServiceComm.prototype.off = function (event, cb) {
-    };
-    ClusterServiceComm.prototype.close = function () {
-    };
-    return ClusterServiceComm;
-}());
-var ClusterService = /** @class */ (function (_super) {
-    __extends(ClusterService, _super);
-    function ClusterService(service, commRegistry, log, paths, config) {
-        var _this = _super.call(this, service, commRegistry, log, paths, config) || this;
-        _this._pendingComms = {};
-        _this._comms = {};
-        return _this;
+    emitWithErrorHandler(onerror, event, ...args) {
     }
-    ClusterService.prototype.openComm0 = function (cb) {
-        var _this = this;
-        crypto.randomBytes(48, function (err, bytes) {
+    on(event, cb) {
+    }
+    off(event, cb) {
+    }
+    close() {
+    }
+}
+class ClusterService extends BuiltInService {
+    constructor(service, commRegistry, log, paths, config) {
+        super(service, commRegistry, log, paths, config);
+        this._pendingComms = {};
+        this._comms = {};
+    }
+    openComm0(cb) {
+        crypto.randomBytes(48, (err, bytes) => {
             if (err)
                 return cb(err);
-            var uid = bytes.toString('hex');
-            _this._worker.send({
+            const uid = bytes.toString('hex');
+            this._worker.send({
                 cmd: "openComm",
-                uid: uid
+                uid
             });
-            _this._pendingComms[uid] = cb;
+            this._pendingComms[uid] = cb;
         });
-    };
-    ClusterService.prototype.start0 = function (cb) {
-        var _this = this;
+    }
+    start0(cb) {
         cluster.setupMaster({
             exec: ClusterService.WORKER,
             silent: true,
             args: []
         });
         var started;
-        var worker = this._worker = cluster.fork(_.extend({
+        const worker = this._worker = cluster.fork(_.extend({
             service: this._service,
             config: JSON.stringify(this._config)
         }, process.env));
         var stdoutline = "";
-        worker.process.stdout.on("data", function (data) {
+        worker.process.stdout.on("data", (data) => {
             stdoutline += data;
             while (true) {
                 var pos = stdoutline.indexOf("\n");
@@ -331,7 +282,7 @@ var ClusterService = /** @class */ (function (_super) {
                     var p = line.indexOf("]");
                     if (p > -1)
                         line = line.substring(p + 2);
-                    _this._logger.info(line);
+                    this._logger.info(line);
                     stdoutline = stdoutline.substring(pos + 1);
                 }
                 else
@@ -340,7 +291,7 @@ var ClusterService = /** @class */ (function (_super) {
         });
         worker.process.stdout.resume();
         var stderrline = "";
-        worker.process.stderr.on("data", function (data) {
+        worker.process.stderr.on("data", (data) => {
             stderrline += data;
             while (true) {
                 var pos = stderrline.indexOf("\n");
@@ -349,7 +300,7 @@ var ClusterService = /** @class */ (function (_super) {
                     var p = line.indexOf("]");
                     if (p > -1)
                         line = line.substring(p + 2);
-                    _this._logger.info(line);
+                    this._logger.info(line);
                     stderrline = stderrline.substring(pos + 1);
                 }
                 else
@@ -357,24 +308,24 @@ var ClusterService = /** @class */ (function (_super) {
             }
         });
         worker.process.stderr.resume();
-        worker.on("message", function (msg) {
+        worker.on("message", (msg) => {
             switch (msg.cmd) {
                 case "commOpened":
-                    _this._pendingComms[msg.uid](undefined, _this._comms[msg.uid] = new ClusterServiceComm());
-                    delete _this._pendingComms[msg.uid];
+                    this._pendingComms[msg.uid](undefined, this._comms[msg.uid] = new ClusterServiceComm());
+                    delete this._pendingComms[msg.uid];
                     break;
                 case "commErrored":
-                    _this._pendingComms[msg.uid](new Error(msg.message));
-                    delete _this._pendingComms[msg.uid];
+                    this._pendingComms[msg.uid](new Error(msg.message));
+                    delete this._pendingComms[msg.uid];
                     break;
                 case "started":
                     started = true;
                     cb();
                     break;
                 case "stopped":
-                    _this._worker = undefined;
+                    this._worker = undefined;
                     if (started) {
-                        _this.stop(_.noop);
+                        this.stop(_.noop);
                         return;
                     }
                     worker.kill();
@@ -382,29 +333,29 @@ var ClusterService = /** @class */ (function (_super) {
                     break;
                 case "error":
                     if (started)
-                        _this.stop(_.noop);
+                        this.stop(_.noop);
                     else
                         cb(new Error(msg.message));
                     break;
                 default:
-                    _this._logger.warn("Unhandled message", msg);
+                    this._logger.warn("Unhandled message", msg);
             }
         });
-        worker.on("error", function (err) {
-            _this._worker = undefined;
+        worker.on("error", (err) => {
+            this._worker = undefined;
             if (started) {
-                _this._logger.error(err);
-                _this.stop(_.noop);
+                this._logger.error(err);
+                this.stop(_.noop);
                 return;
             }
             worker.kill();
             cb(err);
         });
-        worker.on("exit", function (code, signal) {
-            _this._worker = undefined;
+        worker.on("exit", (code, signal) => {
+            this._worker = undefined;
             if (started) {
-                _this._logger.error("Exited", code, signal);
-                _this.stop(_.noop);
+                this._logger.error("Exited", code, signal);
+                this.stop(_.noop);
                 return;
             }
             if (signal)
@@ -414,29 +365,28 @@ var ClusterService = /** @class */ (function (_super) {
             else
                 cb(new Error("Exited"));
         });
-    };
-    ClusterService.prototype.stop0 = function (_cb) {
-        var _this = this;
+    }
+    stop0(_cb) {
         this._comms = {};
         if (!this._worker)
             return _cb();
         this._worker.send({
             cmd: "stop"
         });
-        var worker = this._worker;
-        var cb = function (err) {
-            if (worker != _this._worker)
+        const worker = this._worker;
+        const cb = (err) => {
+            if (worker != this._worker)
                 return;
             worker.removeAllListeners("exit");
             worker.removeAllListeners("error");
             worker.removeAllListeners("message");
-            _this._worker = undefined;
+            this._worker = undefined;
             _cb(err);
         };
         worker.removeAllListeners("exit");
         worker.removeAllListeners("error");
         worker.removeAllListeners("message");
-        worker.on("message", function (msg) {
+        worker.on("message", (msg) => {
             switch (msg.cmd) {
                 case "stopped":
                     worker.send({
@@ -460,47 +410,40 @@ var ClusterService = /** @class */ (function (_super) {
             else
                 cb();
         });
-    };
-    ClusterService.WORKER = path.resolve(__dirname, "worker.js");
-    return ClusterService;
-}(BuiltInService));
-exports.ClusterService = ClusterService;
-var LocalService = /** @class */ (function (_super) {
-    __extends(LocalService, _super);
-    function LocalService(service, commRegistry, log, paths, config) {
-        var _this = _super.call(this, service, commRegistry, log, paths, config) || this;
-        _this._impl = _this.newService();
-        return _this;
     }
-    LocalService.prototype.openComm0 = function (cb) {
+}
+ClusterService.WORKER = path.resolve(__dirname, "worker.js");
+exports.ClusterService = ClusterService;
+class LocalService extends BuiltInService {
+    constructor(service, commRegistry, log, paths, config) {
+        super(service, commRegistry, log, paths, config);
+        this._impl = this.newService();
+    }
+    openComm0(cb) {
         this._impl.openComm(cb);
-    };
-    LocalService.prototype.start0 = function (cb) {
+    }
+    start0(cb) {
         this._impl.start(cb);
-    };
-    LocalService.prototype.stop0 = function (cb) {
+    }
+    stop0(cb) {
         this._impl.stop(cb);
-    };
-    return LocalService;
-}(BuiltInService));
+    }
+}
 exports.LocalService = LocalService;
-var WorkerCount = process.env['WORKER_COUNT'];
-var CPUCount = Math.max(1, (WorkerCount && parseInt(WorkerCount)) || os.cpus().length);
+const WorkerCount = process.env['WORKER_COUNT'];
+const CPUCount = Math.max(1, (WorkerCount && parseInt(WorkerCount)) || os.cpus().length);
 exports.DistributedServiceImpl = CPUCount > 1 ? ClusterService : LocalService;
-var DistributedService = /** @class */ (function (_super) {
-    __extends(DistributedService, _super);
-    function DistributedService(service, commRegistry, log, paths, config) {
-        var _this = _super.call(this, log.extend(service)) || this;
+class DistributedService extends ServiceGroup {
+    constructor(service, commRegistry, log, paths, config) {
+        super(log.extend(service));
         if (CPUCount > 1)
             for (var i = 0; i < CPUCount; i++) {
-                _this.add(new exports.DistributedServiceImpl(service, commRegistry, _this._logger.extend("" + (i + 1)), paths, config));
+                this.add(new exports.DistributedServiceImpl(service, commRegistry, this._logger.extend("" + (i + 1)), paths, config));
             }
         else
-            _this.add(new exports.DistributedServiceImpl(service, commRegistry, _this._logger, paths, config));
-        return _this;
+            this.add(new exports.DistributedServiceImpl(service, commRegistry, this._logger, paths, config));
     }
-    return DistributedService;
-}(ServiceGroup));
+}
 exports.DistributedService = DistributedService;
 // TODO: Add CloudService for linking nexusfork instances together across servers 
 //# sourceMappingURL=service.js.map

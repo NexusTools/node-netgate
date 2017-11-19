@@ -1,6 +1,7 @@
 {
     "compileOnSave": true,
     "compilerOptions": {
+        "target": "es6",
         "declaration": true,
         "module": "commonjs",
         "preserveConstEnums": true,
